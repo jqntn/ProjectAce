@@ -4,11 +4,11 @@
 #pragma warning(push)
 #pragma warning(disable : 4334)
 #pragma warning(disable : 4715)
-#include "chess.hpp"
+#include "utils/chess.hpp"
 #pragma warning(pop)
 
-#include "enet.h"
-#include "json_fwd.hpp"
+#include "enet/enet.h"
+#include "json/json_fwd.hpp"
 
 constexpr auto NETWORK_TICK = 1000 / 20;
 constexpr auto MAX_WAIT = 2000;
@@ -71,7 +71,7 @@ GenUID();
 
 #ifdef PROTOCOL_I_
 
-#include "json.hpp"
+#include "json/json.hpp"
 
 void
 to_json(nlohmann::json& j, const Player& o)

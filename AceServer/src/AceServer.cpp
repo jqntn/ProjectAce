@@ -2,7 +2,7 @@
 #define ENET_IMPLEMENTATION
 #define PROTOCOL_I_
 
-#include "Protocol.h"
+#include "include/Protocol.h"
 
 #pragma warning(push)
 #pragma warning(disable : 4477)
