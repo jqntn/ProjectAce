@@ -132,7 +132,7 @@ main()
     return EXIT_FAILURE;
   }
 
-  auto address = ENetAddress{ ENET_HOST_ANY, 7777 };
+  auto address = ENetAddress{ ENET_HOST_ANY, 8888 };
   auto server = enet_host_create(&address, 64, 2, 0, 0);
   if (server == nullptr) {
     fprintf(stderr,
@@ -146,7 +146,7 @@ main()
       switch (event.type) {
         case ENET_EVENT_TYPE_CONNECT: {
           fprintf(stdout,
-                  "%x:%u - peer connected\n",
+                  "%x:%u - Peer Connected\n",
                   event.peer->address.host,
                   event.peer->address.port);
         } break;
