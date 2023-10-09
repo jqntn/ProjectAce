@@ -145,34 +145,34 @@ main()
     if (enet_host_service(server, &event, NETWORK_TICK) > 0)
       switch (event.type) {
         case ENET_EVENT_TYPE_CONNECT: {
-          // fprintf(stdout,
-          //         "%x:%u - Peer Connected\n",
-          //         event.peer->address.host,
-          //         event.peer->address.port);
+          fprintf(stdout,
+                  "%x:%u - peer connected\n",
+                  event.peer->address.host,
+                  event.peer->address.port);
         } break;
         case ENET_EVENT_TYPE_DISCONNECT: {
-          // fprintf(stdout,
-          //         "%x:%u - Peer Disconnected\n",
-          //         event.peer->address.host,
-          //         event.peer->address.port);
+          fprintf(stdout,
+                  "%x:%u - Peer Disconnected\n",
+                  event.peer->address.host,
+                  event.peer->address.port);
           DisconnectPlayer(event);
         } break;
         case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT: {
-          // fprintf(stdout,
-          //         "%x:%u - Peer Disconnected (timeout)\n",
-          //         event.peer->address.host,
-          //         event.peer->address.port);
+          fprintf(stdout,
+                  "%x:%u - Peer Disconnected (timeout)\n",
+                  event.peer->address.host,
+                  event.peer->address.port);
           DisconnectPlayer(event);
         } break;
         case ENET_EVENT_TYPE_RECEIVE: {
           auto contained = ExtractPacket(event.packet->data);
           HandleEvent(event, contained.first, contained.second);
-          // fprintf(stdout,
-          //         "%x:%u - Packet Received: size: %zu, opcode: %s\n",
-          //         event.peer->address.host,
-          //         event.peer->address.port,
-          //         event.packet->dataLength,
-          //         magic_enum::enum_name((Opcode)contained.first).data());
+          fprintf(stdout,
+                  "%x:%u - Packet Received: size: %zu, opcode: %s\n",
+                  event.peer->address.host,
+                  event.peer->address.port,
+                  event.packet->dataLength,
+                  magic_enum::enum_name((Opcode)contained.first).data());
           enet_packet_destroy(event.packet);
         } break;
       }

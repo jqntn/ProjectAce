@@ -16,7 +16,9 @@ project ("AceServer")
 
 add_executable (AceServer "src/AceServer.cpp")
 
-target_compile_options(AceServer PRIVATE -Wformat=0)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  target_compile_options(AceServer PRIVATE -Wformat=0)
+endif()
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET AceServer PROPERTY CXX_STANDARD 20)
