@@ -3,7 +3,6 @@
 #define PROTOCOL_I_
 
 #include "Protocol.h"
-#include "magic_enum.hpp"
 
 #pragma warning(push)
 #pragma warning(disable : 4477)
@@ -146,20 +145,20 @@ main()
       switch (event.type) {
         case ENET_EVENT_TYPE_CONNECT: {
           fprintf(stdout,
-                  "%x:%u - Peer Connected\n",
+                  "%x:%hu - Peer Connected\n",
                   event.peer->address.host,
                   event.peer->address.port);
         } break;
         case ENET_EVENT_TYPE_DISCONNECT: {
           fprintf(stdout,
-                  "%x:%u - Peer Disconnected\n",
+                  "%x:%hu - Peer Disconnected\n",
                   event.peer->address.host,
                   event.peer->address.port);
           DisconnectPlayer(event);
         } break;
         case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT: {
           fprintf(stdout,
-                  "%x:%u - Peer Disconnected (timeout)\n",
+                  "%x:%hu - Peer Disconnected (timeout)\n",
                   event.peer->address.host,
                   event.peer->address.port);
           DisconnectPlayer(event);
@@ -168,11 +167,11 @@ main()
           auto contained = ExtractPacket(event.packet->data);
           HandleEvent(event, contained.first, contained.second);
           fprintf(stdout,
-                  "%x:%u - Packet Received: size: %zu, opcode: %s\n",
+                  "%x:%hu - Packet Received: size: %zi, opcode: %hhu\n",
                   event.peer->address.host,
                   event.peer->address.port,
                   event.packet->dataLength,
-                  magic_enum::enum_name((Opcode)contained.first).data());
+                  contained.first);
           enet_packet_destroy(event.packet);
         } break;
       }
