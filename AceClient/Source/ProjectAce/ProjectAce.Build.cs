@@ -8,7 +8,7 @@ public class ProjectAce : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "ENet6Library" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
