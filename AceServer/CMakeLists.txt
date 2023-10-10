@@ -16,6 +16,8 @@ project ("AceServer")
 
 add_executable (AceServer "src/AceServer.cpp")
 
+add_compile_definitions(SRV)
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(AceServer PRIVATE -Wformat=0)
 endif()
