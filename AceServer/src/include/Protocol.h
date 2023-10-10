@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "enet/enet.h"
+#include "Inputs.h"
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -22,14 +23,15 @@ enum class Opcode : uint8_t
 {
   SRV_MSG,
   MOVE,
+  C_INPUTS,
 };
 
 // Un joueur envoie ses inputs au serveur
 struct PlayerInputPacket
 {
-	//static constexpr Opcode opcode = Opcode::C_PlayerInput;
+	static constexpr Opcode opcode = Opcode::C_INPUTS;
 
-	//PlayerInputs inputs;
+	PlayerInputs inputs;
 
 	void Serialize(std::vector<std::uint8_t>& byteArray) const;
 	static PlayerInputPacket Unserialize(const std::vector<std::uint8_t>& byteArray, std::size_t& offset);
@@ -37,31 +39,19 @@ struct PlayerInputPacket
 
 void PlayerInputPacket::Serialize(std::vector<std::uint8_t>& byteArray) const
 {
-	// On sérialise chaque input (booléen) en un bit
-	std::uint8_t inputByte = 0;
-// 	if (inputs.jump)
-// 		inputByte |= 1 << 0;
-// 
-// 	if (inputs.moveLeft)
-// 		inputByte |= 1 << 1;
-// 
-// 	if (inputs.moveRight)
-// 		inputByte |= 1 << 2;
-
-	Serialize_u8(byteArray, inputByte);
-	//Serialize_u32(byteArray, inputs.inputIndex);
+	Serialize_f32(byteArray, inputs.pitch);
+	Serialize_f32(byteArray, inputs.yaw);
+	Serialize_f32(byteArray, inputs.roll);
+	Serialize_f32(byteArray, inputs.throttle);
 }
 
 PlayerInputPacket PlayerInputPacket::Unserialize(const std::vector<std::uint8_t>& byteArray, std::size_t& offset)
 {
-	std::uint8_t inputByte = Unserialize_u8(byteArray, offset);
-
-	// On déserialise chaque bit vers les booléens
 	PlayerInputPacket packet;
-	//packet.inputs.jump = inputByte & (1 << 0);
-	//packet.inputs.moveLeft = inputByte & (1 << 1);
-	//packet.inputs.moveRight = inputByte & (1 << 2);
-	//packet.inputs.inputIndex = Unserialize_u32(byteArray, offset);
+	packet.inputs.pitch			= Unserialize_f32(byteArray, offset);
+	packet.inputs.yaw			= Unserialize_f32(byteArray, offset);
+	packet.inputs.roll			= Unserialize_f32(byteArray, offset);
+	packet.inputs.throttle		= Unserialize_f32(byteArray, offset);
 
 	return packet;
 }
@@ -75,7 +65,6 @@ struct PlayerListPacket
 	{
 		std::string name;
 		std::uint16_t index;
-		//Color color;
 	};
 
 	std::vector<Player> players;
@@ -92,7 +81,6 @@ void PlayerListPacket::Serialize(std::vector<std::uint8_t>& byteArray) const
 	{
 		Serialize_str(byteArray, player.name);
 		Serialize_u16(byteArray, player.index);
-		//Serialize_color(byteArray, player.color);
 	}
 }
 
@@ -105,7 +93,6 @@ PlayerListPacket PlayerListPacket::Unserialize(const std::vector<std::uint8_t>& 
 	{
 		player.name = Unserialize_str(byteArray, offset);
 		player.index = Unserialize_u16(byteArray, offset);
-		//player.color = Unserialize_color(byteArray, offset);
 	}
 
 	return packet;
