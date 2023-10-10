@@ -2,6 +2,10 @@
 
 #ifdef SRV
 #include "enet/enet.h"
+#else
+#define htonf
+#define ntohf
+#include <enet6/enet.h>
 #endif
 
 #include <cassert>
@@ -288,10 +292,10 @@ Serialize_f32(std::vector<std::uint8_t>& byteArray,
               std::size_t offset,
               float value)
 {
-  // std::uint32_t v = htonf(value);
+  std::uint32_t v = htonf(value);
 
-  // assert(offset + sizeof(v) <= byteArray.size());
-  // memcpy(&byteArray[offset], &v, sizeof(v));
+  assert(offset + sizeof(v) <= byteArray.size());
+  memcpy(&byteArray[offset], &v, sizeof(v));
 }
 
 void
@@ -420,8 +424,7 @@ Unserialize_f32(const std::vector<std::uint8_t>& byteArray, std::size_t& offset)
   std::uint32_t value;
   memcpy(&value, &byteArray[offset], sizeof(value));
 
-  // float v = ntohf(value);
-  float v = value;
+  float v = ntohf(value);
 
   offset += sizeof(value);
 
