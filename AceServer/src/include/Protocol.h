@@ -21,9 +21,11 @@ constexpr auto NET_TIMEOUT = 1;
 
 enum class Opcode : uint8_t
 {
-  SRV_MSG,
-  MOVE,
-  C_INPUTS,
+	SRV_MSG,
+	MOVE,
+	C_INPUTS,
+	S_PLAYERLIST,
+	S_PLAYERPOSITION
 };
 
 // Un joueur envoie ses inputs au serveur
@@ -59,7 +61,7 @@ PlayerInputPacket PlayerInputPacket::Unserialize(const std::vector<std::uint8_t>
 // Le serveur envoie à un client la liste de tous les joueurs connectés
 struct PlayerListPacket
 {
-	//static constexpr Opcode opcode = Opcode::S_PlayerList;
+	static constexpr Opcode opcode = Opcode::S_PLAYERLIST;
 
 	struct Player
 	{
@@ -98,22 +100,20 @@ PlayerListPacket PlayerListPacket::Unserialize(const std::vector<std::uint8_t>& 
 	return packet;
 }
 
-// Le serveur informe qu'il vient de passer en phase de course (avec une liste des joueurs présents)
 struct PlayersPositionPacket
 {
-	//static constexpr Opcode opcode = Opcode::S_PlayersPosition;
+	static constexpr Opcode opcode = Opcode::S_PLAYERPOSITION;
 
 	struct PlayerData
 	{
 		std::uint8_t playerIndex;
-		//sf::Vector2f position;
+		float position[3];
 	};
 
 	struct CurrentPlayerData
 	{
-		//sf::Vector2f position;
-		//sf::Vector2f velocity;
-		bool isOnGround;
+		float position[3];
+		float velocity[3];
 	};
 
 	std::optional<CurrentPlayerData> currentPlayerData;
@@ -131,22 +131,26 @@ void PlayersPositionPacket::Serialize(std::vector<std::uint8_t>& byteArray) cons
 	Serialize_u32(byteArray, tickIndex);
 
 	Serialize_u16(byteArray, players.size());
-// 	for (const auto& playerData : players)
-// 	{
-// 		Serialize_u8(byteArray, playerData.playerIndex);
-// 		Serialize_f32(byteArray, playerData.position.x);
-// 		Serialize_f32(byteArray, playerData.position.y);
-// 	}
-// 
-// 	Serialize_u8(byteArray, currentPlayerData.has_value());
-// 	if (currentPlayerData)
-// 	{
-// 		Serialize_f32(byteArray, currentPlayerData->position.x);
-// 		Serialize_f32(byteArray, currentPlayerData->position.y);
-// 		Serialize_f32(byteArray, currentPlayerData->velocity.x);
-// 		Serialize_f32(byteArray, currentPlayerData->velocity.y);
-// 		Serialize_u8(byteArray, currentPlayerData->isOnGround);
-// 	}
+ 	for (const auto& playerData : players)
+ 	{
+ 		Serialize_u8(byteArray, playerData.playerIndex);
+ 		Serialize_f32(byteArray, playerData.position[0]); //x
+ 		Serialize_f32(byteArray, playerData.position[1]); //y
+ 		Serialize_f32(byteArray, playerData.position[2]); //z
+ 	}
+ 
+ 	Serialize_u8(byteArray, currentPlayerData.has_value());
+ 	if (currentPlayerData)
+ 	{
+		//Position
+		Serialize_f32(byteArray, currentPlayerData->position[0]); //x
+		Serialize_f32(byteArray, currentPlayerData->position[1]); //y
+		Serialize_f32(byteArray, currentPlayerData->position[2]); //z
+		//Velocity
+		Serialize_f32(byteArray, currentPlayerData->velocity[0]); //x
+		Serialize_f32(byteArray, currentPlayerData->velocity[1]); //y
+		Serialize_f32(byteArray, currentPlayerData->velocity[2]); //z
+ 	}
 }
 
 PlayersPositionPacket PlayersPositionPacket::Unserialize(const std::vector<std::uint8_t>& byteArray, std::size_t& offset)
@@ -156,23 +160,27 @@ PlayersPositionPacket PlayersPositionPacket::Unserialize(const std::vector<std::
 	packet.tickIndex = Unserialize_u32(byteArray, offset);
 
 	packet.players.resize(Unserialize_u16(byteArray, offset));
-// 	for (auto& playerData : packet.players)
-// 	{
-// 		playerData.playerIndex = Unserialize_u8(byteArray, offset);
-// 		playerData.position.x = Unserialize_f32(byteArray, offset);
-// 		playerData.position.y = Unserialize_f32(byteArray, offset);
-// 	}
-// 
-// 	bool hasCurrentPlayerData = Unserialize_u8(byteArray, offset);
-// 	if (hasCurrentPlayerData)
-// 	{
-// 		auto& currentPlayerData = packet.currentPlayerData.emplace();
-// 		currentPlayerData.position.x = Unserialize_f32(byteArray, offset);
-// 		currentPlayerData.position.y = Unserialize_f32(byteArray, offset);
-// 		currentPlayerData.velocity.x = Unserialize_f32(byteArray, offset);
-// 		currentPlayerData.velocity.y = Unserialize_f32(byteArray, offset);
-// 		currentPlayerData.isOnGround = Unserialize_u8(byteArray, offset);
-// 	}
+ 	for (auto& playerData : packet.players)
+ 	{
+ 		playerData.playerIndex = Unserialize_u8(byteArray, offset);
+ 		playerData.position[0] = Unserialize_f32(byteArray, offset);
+ 		playerData.position[1] = Unserialize_f32(byteArray, offset);
+ 		playerData.position[2] = Unserialize_f32(byteArray, offset);
+ 	}
+ 
+ 	bool hasCurrentPlayerData = Unserialize_u8(byteArray, offset);
+ 	if (hasCurrentPlayerData)
+ 	{
+ 		auto& currentPlayerData = packet.currentPlayerData.emplace();
+		//Position
+		currentPlayerData.position[0] = Unserialize_f32(byteArray, offset); //x
+		currentPlayerData.position[1] = Unserialize_f32(byteArray, offset);	//y
+		currentPlayerData.position[2] = Unserialize_f32(byteArray, offset);	//z
+		//Velocity
+		currentPlayerData.velocity[0] = Unserialize_f32(byteArray, offset);	//x
+		currentPlayerData.velocity[1] = Unserialize_f32(byteArray, offset);	//y
+		currentPlayerData.velocity[2] = Unserialize_f32(byteArray, offset);	//z
+ 	}
 
 	return packet;
 }
