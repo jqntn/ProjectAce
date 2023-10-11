@@ -19,20 +19,25 @@ public:
 
 	struct PlaneData
 	{
+		//-------------Constants----------------
 		UPROPERTY(EditAnywhere, Category="FlightPhysics")
-		float _accel				{ 30.f };
+		const float _accel					{ 30.f };
 		UPROPERTY(EditAnywhere, Category="FlightPhysics")
-		float _maxSpeed				{ 4000.f };
+		const float _maxSpeed				{ 4000.f };
 		UPROPERTY(EditAnywhere, Category="FlightPhysics")
-		float _minSpeed				{ 500.f };
+		const float _minSpeed				{ 500.f };
 
 		UPROPERTY(EditAnywhere, Category="FlightPhysics")
-		float _pitchRateMult		{ 200.f };
+		const float _pitchRateMult			{ 200.f };
 		UPROPERTY(EditAnywhere, Category="FlightPhysics")
-		float _rollRateMult			{ 200.f };
+		const float _rollRateMult			{ 200.f };
 
 		UPROPERTY(VisibleAnywhere, Category="FlightPhysics")
-		float _currForwardSpeed		{ 500.f };
+		const float _startForwardSpeed		{ 500.f };
+		//--------------------------------------
+
+		UPROPERTY(VisibleAnywhere, Category="FlightPhysics")
+		float _currForwardSpeed;
 
 		float _currYawSpeed;
 		float _currPitchSpeed;
@@ -78,5 +83,8 @@ private:
   ENetHost* Host = nullptr;
   ENetPeer* ServerPeer = nullptr;
   APawn* _planePawn;
+
+
+  ComputePhysics();
 
 };

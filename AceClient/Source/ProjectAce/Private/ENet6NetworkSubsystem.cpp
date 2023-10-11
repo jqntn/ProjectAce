@@ -190,6 +190,8 @@ UENet6NetworkSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     UE_LOG(ENet6, Error, TEXT("An error occurred while initializing ENet."));
     return;
   }
+
+  _planeData._currForwardSpeed = _planeData._startForwardSpeed;
   
 
 }
