@@ -14,6 +14,53 @@ class PROJECTACE_API UENet6NetworkSubsystem
   GENERATED_BODY()
 
 public:
+
+#pragma region _Plane_
+
+	struct PlaneData
+	{
+		UPROPERTY(EditAnywhere, Category="FlightPhysics")
+		float _accel				{ 30.f };
+		UPROPERTY(EditAnywhere, Category="FlightPhysics")
+		float _maxSpeed				{ 4000.f };
+		UPROPERTY(EditAnywhere, Category="FlightPhysics")
+		float _minSpeed				{ 500.f };
+
+		UPROPERTY(EditAnywhere, Category="FlightPhysics")
+		float _pitchRateMult		{ 200.f };
+		UPROPERTY(EditAnywhere, Category="FlightPhysics")
+		float _rollRateMult			{ 200.f };
+
+		UPROPERTY(VisibleAnywhere, Category="FlightPhysics")
+		float _currForwardSpeed		{ 500.f };
+
+		float _currYawSpeed;
+		float _currPitchSpeed;
+		float _currRollSpeed;
+	};
+	PlaneData _planeData;
+
+	UFUNCTION(BlueprintCallable)
+	void ProcessKeyPitch(float rate);
+	UFUNCTION(BlueprintCallable)
+	void ProcessKeyRoll(float rate);
+
+	UFUNCTION(BlueprintCallable)
+	void ProcessMouseYInput(float value);
+	UFUNCTION(BlueprintCallable)
+	void ProcessMouseXInput(float value);
+
+	//Compute rotation
+	void ProcessRoll(float value);
+	void ProcessPitch(float value);
+
+	UFUNCTION(BlueprintCallable)
+	void SetPlanePawn(APawn* pawn);
+
+	UFUNCTION(BlueprintCallable)
+	APawn* GetPlanePawn();
+#pragma endregion
+
   ETickableTickType GetTickableTickType() const override;
   TStatId GetStatId() const override;
   bool IsAllowedToTick() const override final;
@@ -30,4 +77,6 @@ public:
 private:
   ENetHost* Host = nullptr;
   ENetPeer* ServerPeer = nullptr;
+  APawn* _planePawn;
+
 };
