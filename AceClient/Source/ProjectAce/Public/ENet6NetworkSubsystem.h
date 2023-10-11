@@ -85,6 +85,4 @@ private:
   APawn* _planePawn;
 
 
-  ComputePhysics();
-
 };
