@@ -1,7 +1,7 @@
 #pragma once
 
+#include "utils.hpp"
 #include <cmath>
-#include <math/utils.hpp>
 #include <ostream>
 
 struct Vector3;
