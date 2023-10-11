@@ -20,19 +20,19 @@ public:
   {
     //-------------Constants----------------
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    const float _accel{ 30.f };
+    float _accel              { 30.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    const float _maxSpeed{ 4000.f };
+    float _maxSpeed           { 4000.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    const float _minSpeed{ 500.f };
+    float _minSpeed           { 500.f };
 
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    const float _pitchRateMult{ 200.f };
+    float _pitchRateMult      { 200.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    const float _rollRateMult{ 200.f };
+    float _rollRateMult       { 200.f };
 
     UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
-    const float _startForwardSpeed{ 500.f };
+    float _startForwardSpeed  { 500.f };
     //--------------------------------------
 
     UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
@@ -41,8 +41,14 @@ public:
     float _currYawSpeed;
     float _currPitchSpeed;
     float _currRollSpeed;
+
+    bool _bIntentionalPitch         { false };
+    bool _bIntentionalRoll          { false };
   };
   PlaneData _planeData;
+
+  UFUNCTION(BlueprintCallable)
+  void InitPlaneData(float acceleration, float maxSpeed, float minSpeed, float pitchRateMultiplier, float rollRateMultiplier, float startForwardSpeed);
 
   UFUNCTION(BlueprintCallable)
   void ProcessKeyPitch(float rate);
@@ -53,6 +59,11 @@ public:
   void ProcessMouseYInput(float value);
   UFUNCTION(BlueprintCallable)
   void ProcessMouseXInput(float value);
+
+  UFUNCTION(BlueprintCallable)
+  void SetIntentionalRoll(float value);
+  UFUNCTION(BlueprintCallable)
+  void SetIntentionalPitch(float value);
 
   // Compute rotation
   void ProcessRoll(float value);

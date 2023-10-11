@@ -6,6 +6,16 @@ DEFINE_LOG_CATEGORY_STATIC(ENet6, Log, All);
 
 #pragma region _Plane_
 
+void UENet6NetworkSubsystem::InitPlaneData(float acceleration, float maxSpeed, float minSpeed, float pitchRateMultiplier, float rollRateMultiplier, float startForwardSpeed)
+{
+    _planeData._accel = acceleration;
+    _planeData._maxSpeed = maxSpeed;
+    _planeData._minSpeed = minSpeed;
+    _planeData._pitchRateMult = pitchRateMultiplier;
+    _planeData._rollRateMult = rollRateMultiplier;
+    _planeData._startForwardSpeed = startForwardSpeed;
+}
+
 void
 UENet6NetworkSubsystem::ProcessKeyPitch(float rate)
 {
@@ -33,13 +43,48 @@ UENet6NetworkSubsystem::ProcessMouseXInput(float value)
 }
 
 void
+UENet6NetworkSubsystem::SetIntentionalRoll(float value)
+{
+    if ((_planePawn->GetActorRotation().Roll <= 0.1f && _planePawn->GetActorRotation().Roll >= -0.1f) && value == 0.f) return;
+    _planeData._bIntentionalRoll = FMath::Abs(value) > 0.f;
+
+    float targetRollSpeed = 0.f;
+    if (_planeData._bIntentionalRoll)
+    {
+        targetRollSpeed = (value * _planeData._rollRateMult);
+    }
+    else
+    {
+        targetRollSpeed = (_planePawn->GetActorRotation().Roll * -2.f);
+    }
+
+    _planeData._currRollSpeed = FMath::FInterpTo(_planeData._currRollSpeed,
+        targetRollSpeed,
+        GetWorld()->GetDeltaSeconds(),
+        2.f);
+
+}
+
+void
+UENet6NetworkSubsystem::SetIntentionalPitch(float value)
+{
+    _planeData._bIntentionalPitch = FMath::Abs(value) > 0.f;
+}
+
+void
 UENet6NetworkSubsystem::ProcessRoll(float value)
 {
-  const float targetRollSpeed = value * _planeData._rollRateMult;
+    return;
+    if (_planeData._bIntentionalPitch && !_planeData._bIntentionalRoll) return;
+
+  const float targetRollSpeed = _planeData._bIntentionalRoll ? (value * _planeData._rollRateMult) : (/*_planePawn->GetActorRotation().Roll * -2.f*/0.0f);
   _planeData._currRollSpeed = FMath::FInterpTo(_planeData._currRollSpeed,
-                                               targetRollSpeed,
-                                               GetWorld()->GetDeltaSeconds(),
-                                               2.f);
+      targetRollSpeed,
+      GetWorld()->GetDeltaSeconds(),
+      2.f);
+
+  
+
 }
 
 void
@@ -56,6 +101,12 @@ void
 UENet6NetworkSubsystem::SetPlanePawn(APawn* pawn)
 {
   _planePawn = pawn;
+
+  if (!_planePawn) return;
+  _planeData._currForwardSpeed = _planeData._startForwardSpeed;
+  _planePawn->bUseControllerRotationPitch = false;
+  _planePawn->bUseControllerRotationRoll = false;
+  _planePawn->bUseControllerRotationYaw = false;
 }
 
 APawn*
@@ -104,11 +155,13 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
       FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
     _planePawn->AddActorLocalOffset(localMove, true);
 
-    GEngine->AddOnScreenDebugMessage(
-      0,
-      0.f,
-      FColor::Green,
-      FString::Printf(TEXT("ForwardSpeed: %f"), _planeData._currForwardSpeed));
+     GEngine->AddOnScreenDebugMessage(
+       0,
+       0.f,
+       FColor::Green,
+       FString::Printf(TEXT("ForwardSpeed: %f"), _planeData._currForwardSpeed));
+
+
 
     FRotator deltaRotation(0, 0, 0);
     deltaRotation.Pitch = _planeData._currPitchSpeed * DeltaTime;
@@ -209,7 +262,6 @@ UENet6NetworkSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     return;
   }
 
-  _planeData._currForwardSpeed = _planeData._startForwardSpeed;
 }
 
 void
