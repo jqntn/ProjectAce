@@ -52,6 +52,10 @@ public:
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
     float _accel{ 30.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
+    float _minAccel{ 30.f };
+    UPROPERTY(EditAnywhere, Category = "FlightPhysics")
+    float _maxAccel{ 400.f };
+    UPROPERTY(EditAnywhere, Category = "FlightPhysics")
     float _maxSpeed{ 4000.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
     float _minSpeed{ 500.f };
@@ -60,6 +64,8 @@ public:
     float _pitchRateMult{ 200.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
     float _rollRateMult{ 200.f };
+    UPROPERTY(EditAnywhere, Category = "FlightPhysics")
+    float _yawRate{ 200.f };
 
     UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
     float _startForwardSpeed{ 500.f };
@@ -72,6 +78,10 @@ public:
     float _currPitchSpeed;
     float _currRollSpeed;
 
+    float _currYawValue;
+    float _currPitchValue;
+    float _currRollValue;
+
     bool _bIntentionalPitch{ false };
     bool _bIntentionalRoll{ false };
   };
@@ -79,33 +89,30 @@ public:
 
   UFUNCTION(BlueprintCallable)
   void InitPlaneData(float acceleration,
+                     float minAcceleration,
+                     float maxAcceleration,
                      float maxSpeed,
                      float minSpeed,
                      float pitchRateMultiplier,
                      float rollRateMultiplier,
+                     float yawRate,
                      float startForwardSpeed);
 
   UFUNCTION(BlueprintCallable)
-  void ProcessKeyPitch(float rate);
+  void SetlRollInput(float value);
   UFUNCTION(BlueprintCallable)
-  void ProcessKeyRoll(float rate);
+  void SetPitchInput(float value);
+  UFUNCTION(BlueprintCallable)
+  void SetYawInput(float value);
 
   UFUNCTION(BlueprintCallable)
-  void ProcessMouseYInput(float value);
-  UFUNCTION(BlueprintCallable)
-  void ProcessMouseXInput(float value);
-
-  UFUNCTION(BlueprintCallable)
-  void SetIntentionalRoll(float value);
-  UFUNCTION(BlueprintCallable)
-  void SetIntentionalPitch(float value);
-
-  // Compute rotation
-  void ProcessRoll(float value);
-  void ProcessPitch(float value);
+  void SetThrust(float thrustAdd);
 
   UFUNCTION(BlueprintCallable)
   void SetPlanePawn(APawn* pawn);
+
+  UFUNCTION(BlueprintCallable)
+  float GetCurrentPlaneAccel();
 
   UFUNCTION(BlueprintCallable)
   APawn* GetPlanePawn();
@@ -133,8 +140,10 @@ public:
 private:
   ENetHost* Host = nullptr;
   ENetPeer* ServerPeer = nullptr;
-
-  APawn* _planePawn = nullptr;
-
+  APawn* _planePawn;
   GameData gameData;
+
+  void ProcessRoll();
+  void ProcessPitch();
+  void ProcessYaw();
 };
