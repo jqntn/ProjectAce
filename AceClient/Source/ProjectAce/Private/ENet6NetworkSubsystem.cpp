@@ -6,21 +6,24 @@ DEFINE_LOG_CATEGORY_STATIC(ENet6, Log, All);
 
 void
 UENet6NetworkSubsystem::InitPlaneData(float acceleration,
-	float minAcceleration,
-	float maxAcceleration,
-	float maxSpeed,
-	float minSpeed,
-	float pitchRateMultiplier,
-	float rollRateMultiplier,
-	float yawRate,
-	float startForwardSpeed,
-	bool resolveRoll,
-	float maxResolveRollTime)
+	                                  float minAcceleration,
+	                                  float maxAcceleration,
+	                                  float maxSpeed,
+	                                  float minSpeed,
+                                      float thrustAccelRate,
+	                                  float pitchRateMultiplier,
+	                                  float rollRateMultiplier,
+	                                  float yawRate,
+	                                  float startForwardSpeed,
+	                                  bool resolveRoll,
+	                                  float maxResolveRollTime)
 {
   _planeData._accel = acceleration;
   _planeData._minAccel = minAcceleration;
   _planeData._maxAccel = maxAcceleration;
   _planeData._minSpeed = minSpeed;
+  _planeData._maxSpeed = maxSpeed;
+  _planeData._thrustAccelRate = thrustAccelRate;
   _planeData._pitchRateMult = pitchRateMultiplier;
   _planeData._rollRateMult = rollRateMultiplier;
   _planeData._yawRate = yawRate;
@@ -98,10 +101,14 @@ UENet6NetworkSubsystem::SetYawInput(float value)
 void
 UENet6NetworkSubsystem::SetThrust(float thrustAdd)
 {
+    _planeData._bIsThrottle = (thrustAdd != 0.f);
+
+    if (thrustAdd == 0.f) return;
   const float newThrust =
-    _planeData._accel + (thrustAdd * (GetWorld()->GetDeltaSeconds() * 5000.f));
-  _planeData._accel = newThrust; // FMath::Clamp(_planeData._accel,
-                                 // _planeData._minAccel, _planeData._maxAccel);
+    (thrustAdd * (GetWorld()->GetDeltaSeconds() * _planeData._thrustAccelRate));
+
+  _planeData._accel += (newThrust);
+	  
 }
 
 void
@@ -165,20 +172,31 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
       -_planePawn->GetActorRotation().Pitch *
       DeltaTime /* * _planeData._accel*/; // Tilt up > slow down, Tilt down >
                                           // accelerate
-    const float newForwardSpeed =
-      (_planeData._currForwardSpeed + currAccel) * _planeData._accel;
-    _planeData._currForwardSpeed =
-      FMath::Clamp(newForwardSpeed, _planeData._minSpeed, _planeData._maxSpeed);
+    if (_planeData._bIsThrottle)
+    {
+		const float newForwardSpeed =
+			(_planeData._currForwardSpeed + currAccel) * _planeData._accel;
+		_planeData._currForwardSpeed = //newForwardSpeed;
+			FMath::Clamp(newForwardSpeed, _planeData._minSpeed, _planeData._maxSpeed);
+
+    }
+    
 
     const FVector localMove =
       FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
     _planePawn->AddActorLocalOffset(localMove, true);
 
-     GEngine->AddOnScreenDebugMessage(
-       0,
-       0.f,
-       FColor::Green,
-       FString::Printf(TEXT("ForwardSpeed: %f"), localMove.X));
+// 	GEngine->AddOnScreenDebugMessage(
+// 		0,
+// 		0.f,
+// 		FColor::Green,
+// 		FString::Printf(TEXT("ForwardSpeed: %f"), _planeData._accel));
+
+//      GEngine->AddOnScreenDebugMessage(
+//        0,
+//        0.f,
+//        FColor::Green,
+//        FString::Printf(TEXT("ForwardSpeed: %f"), localMove.X));
 
 //     GEngine->AddOnScreenDebugMessage(
 //         0,

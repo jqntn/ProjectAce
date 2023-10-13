@@ -59,6 +59,8 @@ public:
     float _maxSpeed{ 4000.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
     float _minSpeed{ 500.f };
+	UPROPERTY(EditAnywhere, Category = "FlightPhysics")
+	float _thrustAccelRate{ 500.f };
 
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
     float _pitchRateMult{ 200.f };
@@ -91,21 +93,24 @@ public:
     float _currResolveRollTimer{ 0.0f };
     UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
     float _maxResolveRollTimer{ 1.0f };
+
+    bool _bIsThrottle{ false };
   };
   PlaneData _planeData;
 
   UFUNCTION(BlueprintCallable)
   void InitPlaneData(float acceleration,
-                     float minAcceleration,
-                     float maxAcceleration,
-                     float maxSpeed,
-                     float minSpeed,
-                     float pitchRateMultiplier,
-                     float rollRateMultiplier,
-                     float yawRate,
-                     float startForwardSpeed,
-                     bool resolveRoll,
-                     float maxResolveRollTime);
+	  float minAcceleration,
+	  float maxAcceleration,
+	  float maxSpeed,
+	  float minSpeed,
+	  float thrustAccelRate,
+	  float pitchRateMultiplier,
+	  float rollRateMultiplier,
+	  float yawRate,
+	  float startForwardSpeed,
+	  bool resolveRoll,
+	  float maxResolveRollTime);
 
   UFUNCTION(BlueprintCallable)
   void SetlRollInput(float value);
