@@ -174,11 +174,17 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
       FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
     _planePawn->AddActorLocalOffset(localMove, true);
 
-    GEngine->AddOnScreenDebugMessage(
-      0,
-      0.f,
-      FColor::Green,
-      FString::Printf(TEXT("ForwardSpeed: %f"), localMove.X));
+     GEngine->AddOnScreenDebugMessage(
+       0,
+       0.f,
+       FColor::Green,
+       FString::Printf(TEXT("ForwardSpeed: %f"), localMove.X));
+
+//     GEngine->AddOnScreenDebugMessage(
+//         0,
+//         0.f,
+//         FColor::Green,
+//         FString::Printf(TEXT("Pitch, Roll, Yaw: %f, %f, %f"), _planeData._currPitchValue, _planeData._currRollValue, _planeData._currYawValue));
 
     ProcessPitch();
     ProcessRoll();
