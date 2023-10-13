@@ -84,6 +84,13 @@ public:
 
     bool _bIntentionalPitch{ false };
     bool _bIntentionalRoll{ false };
+
+    UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
+    bool _bResolveRoll{ false }; //If true, plane will automatically roll to flat if no input pressed after second
+
+    float _currResolveRollTimer{ 0.0f };
+    UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
+    float _maxResolveRollTimer{ 1.0f };
   };
   PlaneData _planeData;
 
@@ -96,7 +103,9 @@ public:
                      float pitchRateMultiplier,
                      float rollRateMultiplier,
                      float yawRate,
-                     float startForwardSpeed);
+                     float startForwardSpeed,
+                     bool resolveRoll,
+                     float maxResolveRollTime);
 
   UFUNCTION(BlueprintCallable)
   void SetlRollInput(float value);

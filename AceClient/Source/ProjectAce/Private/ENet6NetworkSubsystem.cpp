@@ -6,14 +6,16 @@ DEFINE_LOG_CATEGORY_STATIC(ENet6, Log, All);
 
 void
 UENet6NetworkSubsystem::InitPlaneData(float acceleration,
-                                      float minAcceleration,
-                                      float maxAcceleration,
-                                      float maxSpeed,
-                                      float minSpeed,
-                                      float pitchRateMultiplier,
-                                      float rollRateMultiplier,
-                                      float yawRate,
-                                      float startForwardSpeed)
+	float minAcceleration,
+	float maxAcceleration,
+	float maxSpeed,
+	float minSpeed,
+	float pitchRateMultiplier,
+	float rollRateMultiplier,
+	float yawRate,
+	float startForwardSpeed,
+	bool resolveRoll,
+	float maxResolveRollTime)
 {
   _planeData._accel = acceleration;
   _planeData._minAccel = minAcceleration;
@@ -23,6 +25,8 @@ UENet6NetworkSubsystem::InitPlaneData(float acceleration,
   _planeData._rollRateMult = rollRateMultiplier;
   _planeData._yawRate = yawRate;
   _planeData._startForwardSpeed = startForwardSpeed;
+  _planeData._bResolveRoll = resolveRoll;
+  _planeData._maxResolveRollTimer = maxResolveRollTime;
 }
 
 void
@@ -37,7 +41,8 @@ UENet6NetworkSubsystem::ProcessRoll()
   float targetRollSpeed = 0.f;
   if (_planeData._bIntentionalRoll) {
     targetRollSpeed = (_planeData._currRollValue * _planeData._rollRateMult);
-  } else {
+    _planeData._currResolveRollTimer = 0.0f;
+  } else if (_planeData._bResolveRoll && _planeData._currResolveRollTimer >= _planeData._maxResolveRollTimer && _planeData._currRollValue == 0.0f && _planeData._currPitchValue == 0.0f) {
     targetRollSpeed = (_planePawn->GetActorRotation().Roll * -2.f);
   }
 
@@ -56,6 +61,8 @@ UENet6NetworkSubsystem::ProcessPitch()
                                                 targetPitchSpeed,
                                                 GetWorld()->GetDeltaSeconds(),
                                                 2.f);
+
+  if (_planeData._currPitchValue != 0.f) _planeData._currPitchValue;
 }
 
 void
@@ -150,6 +157,9 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
 
   // Plane physics
   if (_planePawn) {
+
+      if (_planeData._bResolveRoll) _planeData._currResolveRollTimer += DeltaTime;
+
     // Compute Thrust
     const float currAccel =
       -_planePawn->GetActorRotation().Pitch *
