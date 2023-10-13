@@ -107,8 +107,19 @@ UENet6NetworkSubsystem::SetThrust(float thrustAdd)
   const float newThrust =
     (thrustAdd * (GetWorld()->GetDeltaSeconds() * _planeData._thrustAccelRate));
 
-  _planeData._accel += (newThrust);
-	  
+  if (thrustAdd < 0.1f)
+  {
+	  GEngine->AddOnScreenDebugMessage(
+		  0,
+		  0.f,
+		  FColor::Green,
+		  FString::Printf(TEXT("ForwardSpeed: %f, %f, %f"), thrustAdd, newThrust, _planeData._accel));
+	  _planeData._accel += (newThrust); // FMath::Clamp(_planeData._accel, _planeData._minAccel, _planeData._maxAccel);
+
+  }
+  else if (thrustAdd > 0.1f)
+	  _planeData._accel += (newThrust);
+
 }
 
 void
@@ -170,7 +181,7 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
     // Compute Thrust
     const float currAccel =
       -_planePawn->GetActorRotation().Pitch *
-      DeltaTime /* * _planeData._accel*/; // Tilt up > slow down, Tilt down >
+      DeltaTime * _planeData._accel; // Tilt up > slow down, Tilt down >
                                           // accelerate
     if (_planeData._bIsThrottle)
     {
@@ -186,11 +197,11 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
       FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
     _planePawn->AddActorLocalOffset(localMove, true);
 
-// 	GEngine->AddOnScreenDebugMessage(
-// 		0,
-// 		0.f,
-// 		FColor::Green,
-// 		FString::Printf(TEXT("ForwardSpeed: %f"), _planeData._accel));
+ 	GEngine->AddOnScreenDebugMessage(
+ 		0,
+ 		0.f,
+ 		FColor::Green,
+ 		FString::Printf(TEXT("ForwardSpeed: %f"), currAccel));
 
 //      GEngine->AddOnScreenDebugMessage(
 //        0,
