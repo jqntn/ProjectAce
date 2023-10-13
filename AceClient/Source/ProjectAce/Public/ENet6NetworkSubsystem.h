@@ -1,10 +1,40 @@
 #pragma once
 
+#include "../../../../AceServer/src/include/Protocol.h"
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include <enet6/enet.h>
 
 #include "ENet6NetworkSubsystem.generated.h"
+
+struct PredictedInput
+{
+  PlayerInput Input;
+};
+
+struct Player
+{
+  size_t Index = 0;
+  std::string Name;
+
+  Vector3 Position;
+  Vector3 Velocity;
+};
+
+struct GameData
+{
+  ENetPeer* ServerPeer = nullptr;
+
+  std::vector<Player> Players;
+  size_t OwnPlayerIndex = 0;
+
+  PlayerInput Input;
+  uint32_t InputIndex = 1;
+  std::vector<PredictedInput> PredictedInputs;
+
+  std::vector<PlayersPositionPacket> InterpolationBuffer;
+  float InterpolationTime = 0.f;
+};
 
 UCLASS()
 class PROJECTACE_API UENet6NetworkSubsystem
@@ -20,19 +50,19 @@ public:
   {
     //-------------Constants----------------
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    float _accel              { 30.f };
+    float _accel{ 30.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    float _maxSpeed           { 4000.f };
+    float _maxSpeed{ 4000.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    float _minSpeed           { 500.f };
+    float _minSpeed{ 500.f };
 
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    float _pitchRateMult      { 200.f };
+    float _pitchRateMult{ 200.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
-    float _rollRateMult       { 200.f };
+    float _rollRateMult{ 200.f };
 
     UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
-    float _startForwardSpeed  { 500.f };
+    float _startForwardSpeed{ 500.f };
     //--------------------------------------
 
     UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
@@ -42,13 +72,18 @@ public:
     float _currPitchSpeed;
     float _currRollSpeed;
 
-    bool _bIntentionalPitch         { false };
-    bool _bIntentionalRoll          { false };
+    bool _bIntentionalPitch{ false };
+    bool _bIntentionalRoll{ false };
   };
   PlaneData _planeData;
 
   UFUNCTION(BlueprintCallable)
-  void InitPlaneData(float acceleration, float maxSpeed, float minSpeed, float pitchRateMultiplier, float rollRateMultiplier, float startForwardSpeed);
+  void InitPlaneData(float acceleration,
+                     float maxSpeed,
+                     float minSpeed,
+                     float pitchRateMultiplier,
+                     float rollRateMultiplier,
+                     float startForwardSpeed);
 
   UFUNCTION(BlueprintCallable)
   void ProcessKeyPitch(float rate);
@@ -89,8 +124,17 @@ public:
   void Initialize(FSubsystemCollectionBase& Collection) override;
   void Deinitialize() override;
 
+  void ComputePhysics(Player& player,
+                      const PlayerInput& input,
+                      float elapsedTime);
+
+  void HandleMessage(const std::vector<uint8_t>& message);
+
 private:
   ENetHost* Host = nullptr;
   ENetPeer* ServerPeer = nullptr;
-  APawn* _planePawn;
+
+  APawn* _planePawn = nullptr;
+
+  GameData gameData;
 };

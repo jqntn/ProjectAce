@@ -25,6 +25,7 @@ constexpr auto NET_CHANNELS = 2;
 constexpr auto NET_TIMEOUT = 1;
 
 constexpr auto TargetInputBufferSize = 5;
+constexpr auto TargetInterpolationBufferSize = 5;
 
 enum class Opcode : uint8_t
 {

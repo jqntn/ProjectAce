@@ -239,7 +239,7 @@ BuildPlayerPositionPacket(GameData& gameData, const Player& player)
   packet.TickIndex = gameData.TickIndex;
 
   auto& currentPlayerData = packet.CurrentPlayerData.emplace();
-  currentPlayerData.Position = player.Position;
+  currentPlayerData.Position = /*player.Position*/ Vector3(10,10,10);
   currentPlayerData.Velocity = player.Velocity;
 
   for (const auto& other : gameData.Players) {
@@ -248,7 +248,7 @@ BuildPlayerPositionPacket(GameData& gameData, const Player& player)
     if (other.Peer != nullptr) {
       auto& packetPlayer = packet.Players.emplace_back();
       packetPlayer.PlayerIndex = other.Index;
-      packetPlayer.Position = other.Position;
+      packetPlayer.Position = /*other.Position*/ Vector3(10, 10, 10);
     }
   }
 
