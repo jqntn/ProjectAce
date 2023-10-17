@@ -9,6 +9,7 @@
 #endif
 
 #include "math/vector3.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <optional>
@@ -56,6 +57,15 @@ struct Player
   float InputBufferAdvancement = 0;
 
   Vector3 Position;
+  Vector3 Rotation;
+
+  float _currPitchSpeed = 0;
+  float _currYawSpeed = 0;
+  float _currRollSpeed = 0;
+  float _currForwardSpeed = 0;
+  float _currResolveRollTimer = 0;
+  float _maxResolveRollTimer = 1;
+  bool _bIntentionalRoll = false;
 };
 
 void
@@ -207,10 +217,12 @@ struct PlayersPositionPacket
   {
     uint8_t PlayerIndex = 0;
     Vector3 Position;
+    Vector3 Rotation;
   };
   struct CurrentPlayerData
   {
     Vector3 Position;
+    Vector3 Rotation;
   };
 
   std::optional<CurrentPlayerData> CurrentPlayerData;
@@ -235,6 +247,9 @@ PlayersPositionPacket::Serialize(std::vector<uint8_t>& byteArray) const
     Serialize_f32(byteArray, playerData.Position.x);
     Serialize_f32(byteArray, playerData.Position.y);
     Serialize_f32(byteArray, playerData.Position.z);
+    Serialize_f32(byteArray, playerData.Rotation.x);
+    Serialize_f32(byteArray, playerData.Rotation.y);
+    Serialize_f32(byteArray, playerData.Rotation.z);
   }
 
   Serialize_u8(byteArray, CurrentPlayerData.has_value());
@@ -242,6 +257,9 @@ PlayersPositionPacket::Serialize(std::vector<uint8_t>& byteArray) const
     Serialize_f32(byteArray, CurrentPlayerData->Position.x);
     Serialize_f32(byteArray, CurrentPlayerData->Position.y);
     Serialize_f32(byteArray, CurrentPlayerData->Position.z);
+    Serialize_f32(byteArray, CurrentPlayerData->Rotation.x);
+    Serialize_f32(byteArray, CurrentPlayerData->Rotation.y);
+    Serialize_f32(byteArray, CurrentPlayerData->Rotation.z);
   }
 }
 inline PlayersPositionPacket
@@ -258,6 +276,9 @@ PlayersPositionPacket::Unserialize(const std::vector<uint8_t>& byteArray,
     playerData.Position.x = Unserialize_f32(byteArray, offset);
     playerData.Position.y = Unserialize_f32(byteArray, offset);
     playerData.Position.z = Unserialize_f32(byteArray, offset);
+    playerData.Rotation.x = Unserialize_f32(byteArray, offset);
+    playerData.Rotation.y = Unserialize_f32(byteArray, offset);
+    playerData.Rotation.z = Unserialize_f32(byteArray, offset);
   }
 
   bool hasCurrentPlayerData = (bool)Unserialize_u8(byteArray, offset);
@@ -266,6 +287,9 @@ PlayersPositionPacket::Unserialize(const std::vector<uint8_t>& byteArray,
     currentPlayerData.Position.x = Unserialize_f32(byteArray, offset);
     currentPlayerData.Position.y = Unserialize_f32(byteArray, offset);
     currentPlayerData.Position.z = Unserialize_f32(byteArray, offset);
+    currentPlayerData.Rotation.x = Unserialize_f32(byteArray, offset);
+    currentPlayerData.Rotation.y = Unserialize_f32(byteArray, offset);
+    currentPlayerData.Rotation.z = Unserialize_f32(byteArray, offset);
   }
 
   return packet;
@@ -453,9 +477,69 @@ BuildPacket(const T& packet, enet_uint32 flags)
   return enet_packet_create(bytes.data(), bytes.size(), flags);
 }
 
+//-------------Constants----------------
+inline float _accel{ 1.f };
+inline float _minAccel{ 1.f };
+inline float _maxAccel{ 400.f };
+inline float _maxSpeed{ 1000 };
+inline float _minSpeed{ 1 };
+inline float _thrustAccelRate{ 500.f };
+inline float _pitchRateMult{ 200.f };
+inline float _rollRateMult{ 200.f };
+inline float _yawRate{ 200.f };
+inline float _startForwardSpeed{ 500.f };
+//--------------------------------------
+
 inline void
 ComputePhysics(Player& player, const PlayerInput& input, float elapsedTime)
 {
-  player.Position.x += 50 * input.Pitch;
-  player.Position.y += 50 * input.Roll;
+  auto _bResolveRoll = true;
+
+  if (_bResolveRoll)
+    player._currResolveRollTimer += elapsedTime;
+  float currAccel = -player.Rotation.x * elapsedTime;
+  float newForwardSpeed =
+    (player._currForwardSpeed + currAccel) * input.Throttle;
+  player._currForwardSpeed = std::clamp(newForwardSpeed, _minSpeed, _maxSpeed);
+  {
+    float targetPitchSpeed = input.Pitch * _pitchRateMult;
+    // player._currPitchSpeed =
+    //   SmoothLerp(player._currPitchSpeed, targetPitchSpeed, elapsedTime, 2.f);
+    player._currPitchSpeed = targetPitchSpeed;
+  }
+  {
+    if ((player.Rotation.z <= 0.1f && player.Rotation.z >= -0.1f) &&
+        input.Roll == 0.f)
+      return;
+    player._bIntentionalRoll = std::abs(input.Roll) > 0.f;
+
+    float targetRollSpeed = 0.f;
+    if (player._bIntentionalRoll) {
+      targetRollSpeed = (input.Roll * _rollRateMult);
+      player._currResolveRollTimer = 0.0f;
+    } else if (_bResolveRoll &&
+               player._currResolveRollTimer >= player._maxResolveRollTimer &&
+               input.Roll == 0.0f && input.Pitch == 0.0f) {
+      targetRollSpeed = (player.Rotation.z * -2.f);
+    }
+    // player._currRollSpeed =
+    //   SmoothLerp(player._currRollSpeed, targetRollSpeed, elapsedTime, 2.f);
+    player._currRollSpeed = targetRollSpeed;
+  }
+  {
+    if (input.Yaw == 0.f)
+      player._currYawSpeed = 0.f;
+    else {
+      float targetYawSpeed = input.Yaw * _pitchRateMult;
+      player._currYawSpeed = targetYawSpeed;
+    }
+  }
+  Vector3 localMove = Vector3(player._currForwardSpeed * elapsedTime, 0.f, 0.f);
+  Vector3 deltaRotation(0, 0, 0);
+  deltaRotation.x = player._currPitchSpeed * elapsedTime;
+  deltaRotation.y = player._currYawSpeed * elapsedTime;
+  deltaRotation.z = player._currRollSpeed * elapsedTime;
+
+  player.Position += localMove;
+  player.Rotation += deltaRotation;
 }

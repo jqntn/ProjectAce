@@ -167,28 +167,6 @@ UENet6NetworkSubsystem::IsAllowedToTick() const
 void
 UENet6NetworkSubsystem::Tick(float DeltaTime)
 {
-  // if (_planePawn) {
-  //   if (_planeData._bResolveRoll)
-  //     _planeData._currResolveRollTimer += DeltaTime;
-  //   const float currAccel = -_planePawn->GetActorRotation().Pitch *
-  //   DeltaTime; const float newForwardSpeed =
-  //     (_planeData._currForwardSpeed + currAccel) * _planeData._accel;
-  //   _planeData._currForwardSpeed =
-  //     FMath::Clamp(newForwardSpeed, _planeData._minSpeed,
-  //     _planeData._maxSpeed);
-  //   const FVector localMove =
-  //     FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
-  //   _planePawn->AddActorLocalOffset(localMove, true);
-  //   ProcessPitch();
-  //   ProcessRoll();
-  //   ProcessYaw();
-  //   FRotator deltaRotation(0, 0, 0);
-  //   deltaRotation.Pitch = _planeData._currPitchSpeed * DeltaTime;
-  //   deltaRotation.Yaw = _planeData._currYawSpeed * DeltaTime;
-  //   deltaRotation.Roll = _planeData._currRollSpeed * DeltaTime;
-  //   _planePawn->AddActorLocalRotation(deltaRotation);
-  // }
-
   if (Host == nullptr)
     return;
   auto Event = ENetEvent();
@@ -227,6 +205,7 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
     gameData.Input.Pitch = _planeData._currPitchValue;
     gameData.Input.Yaw = _planeData._currYawValue;
     gameData.Input.Roll = _planeData._currRollValue;
+    gameData.Input.Throttle = _planeData._accel;
   }
   {
     auto packet = PlayerInputPacket();
@@ -243,7 +222,10 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
       auto& player = *it;
       ComputePhysics(player, packet.Input, DeltaTime);
       auto position = player.Position;
+      auto rotation = player.Rotation;
       _planePawn->SetActorLocation(FVector(position.x, position.y, position.z));
+      _planePawn->SetActorRotation(
+        FVector(rotation.x, rotation.y, rotation.z).ToOrientationQuat());
     }
 
     auto predictedInput = PredictedInput();
@@ -447,12 +429,18 @@ UENet6NetworkSubsystem::HandleMessage(const std::vector<uint8_t>& message)
         if (packet.CurrentPlayerData.has_value()) {
           auto predictedPosition = ownPlayer.Position;
           ownPlayer.Position = packet.CurrentPlayerData->Position;
+          ownPlayer.Rotation = packet.CurrentPlayerData->Rotation;
           for (auto& predictedInput : gameData.PredictedInputs)
             ComputePhysics(ownPlayer, predictedInput.Input, NET_TICK);
           auto reconciliatedPosition = ownPlayer.Position;
+          auto reconciliatedRotation = ownPlayer.Rotation;
           _planePawn->SetActorLocation(FVector(reconciliatedPosition.x,
                                                reconciliatedPosition.y,
                                                reconciliatedPosition.z));
+          _planePawn->SetActorRotation(FVector(reconciliatedRotation.x,
+                                               reconciliatedRotation.y,
+                                               reconciliatedRotation.z)
+                                         .ToOrientationQuat());
         }
       }
     } break;

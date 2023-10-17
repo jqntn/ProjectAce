@@ -217,6 +217,7 @@ BuildPlayerPositionPacket(GameData& gameData, const Player& player)
 
   auto& currentPlayerData = packet.CurrentPlayerData.emplace();
   currentPlayerData.Position = player.Position;
+  currentPlayerData.Rotation = player.Rotation;
 
   for (const auto& other : gameData.Players) {
     if (player.Index == other.Index)
@@ -225,6 +226,7 @@ BuildPlayerPositionPacket(GameData& gameData, const Player& player)
       auto& packetPlayer = packet.Players.emplace_back();
       packetPlayer.PlayerIndex = other.Index;
       packetPlayer.Position = other.Position;
+      packetPlayer.Rotation = other.Rotation;
     }
   }
 
