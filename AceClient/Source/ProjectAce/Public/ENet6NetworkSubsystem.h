@@ -59,6 +59,8 @@ public:
     float _maxSpeed{ 4000.f };
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
     float _minSpeed{ 500.f };
+    UPROPERTY(EditAnywhere, Category = "FlightPhysics")
+    float _thrustAccelRate{ 500.f };
 
     UPROPERTY(EditAnywhere, Category = "FlightPhysics")
     float _pitchRateMult{ 200.f };
@@ -84,6 +86,16 @@ public:
 
     bool _bIntentionalPitch{ false };
     bool _bIntentionalRoll{ false };
+
+    UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
+    bool _bResolveRoll{ false }; // If true, plane will automatically roll to
+                                 // flat if no input pressed after second
+
+    float _currResolveRollTimer{ 0.0f };
+    UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
+    float _maxResolveRollTimer{ 1.0f };
+
+    bool _bIsThrottle{ false };
   };
   PlaneData _planeData;
 
@@ -93,10 +105,13 @@ public:
                      float maxAcceleration,
                      float maxSpeed,
                      float minSpeed,
+                     float thrustAccelRate,
                      float pitchRateMultiplier,
                      float rollRateMultiplier,
                      float yawRate,
-                     float startForwardSpeed);
+                     float startForwardSpeed,
+                     bool resolveRoll,
+                     float maxResolveRollTime);
 
   UFUNCTION(BlueprintCallable)
   void SetlRollInput(float value);
