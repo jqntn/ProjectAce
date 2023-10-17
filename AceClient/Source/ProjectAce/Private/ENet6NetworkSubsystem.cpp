@@ -167,140 +167,141 @@ UENet6NetworkSubsystem::IsAllowedToTick() const
 void
 UENet6NetworkSubsystem::Tick(float DeltaTime)
 {
+  // if (_planePawn) {
+  //   if (_planeData._bResolveRoll)
+  //     _planeData._currResolveRollTimer += DeltaTime;
+  //   const float currAccel = -_planePawn->GetActorRotation().Pitch *
+  //   DeltaTime; const float newForwardSpeed =
+  //     (_planeData._currForwardSpeed + currAccel) * _planeData._accel;
+  //   _planeData._currForwardSpeed =
+  //     FMath::Clamp(newForwardSpeed, _planeData._minSpeed,
+  //     _planeData._maxSpeed);
+  //   const FVector localMove =
+  //     FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
+  //   _planePawn->AddActorLocalOffset(localMove, true);
+  //   ProcessPitch();
+  //   ProcessRoll();
+  //   ProcessYaw();
+  //   FRotator deltaRotation(0, 0, 0);
+  //   deltaRotation.Pitch = _planeData._currPitchSpeed * DeltaTime;
+  //   deltaRotation.Yaw = _planeData._currYawSpeed * DeltaTime;
+  //   deltaRotation.Roll = _planeData._currRollSpeed * DeltaTime;
+  //   _planePawn->AddActorLocalRotation(deltaRotation);
+  // }
+
+  if (Host == nullptr)
+    return;
+  auto Event = ENetEvent();
+  if (enet_host_service(Host, &Event, NET_TIMEOUT) > 0) {
+    do {
+      switch (Event.type) {
+        case ENetEventType::ENET_EVENT_TYPE_CONNECT: {
+          UE_LOG(ENet6,
+                 Log,
+                 TEXT("Peer %u connected!"),
+                 enet_peer_get_id(Event.peer));
+        } break;
+        case ENetEventType::ENET_EVENT_TYPE_DISCONNECT: {
+          UE_LOG(ENet6,
+                 Log,
+                 TEXT("Peer %u disconnected!"),
+                 enet_peer_get_id(Event.peer));
+        } break;
+        case ENetEventType::ENET_EVENT_TYPE_RECEIVE: {
+          UE_LOG(ENet6,
+                 Log,
+                 TEXT("Peer %u sent data (%u bytes)"),
+                 enet_peer_get_id(Event.peer),
+                 enet_packet_get_length(Event.packet));
+          auto len = Event.packet->dataLength;
+          auto bytes = std::vector<uint8_t>(len);
+          memcpy(bytes.data(), Event.packet->data, len);
+          HandleMessage(bytes);
+          enet_packet_dispose(Event.packet);
+        } break;
+      }
+    } while (enet_host_check_events(Host, &Event) > 0);
+  }
+
   {
-    if (_planePawn) {
-      if (_planeData._bResolveRoll)
-        _planeData._currResolveRollTimer += DeltaTime;
-      const float currAccel =
-        -_planePawn->GetActorRotation().Pitch * DeltaTime * _planeData._accel;
-      if (_planeData._bIsThrottle) {
-        const float newForwardSpeed =
-          (_planeData._currForwardSpeed + currAccel) * _planeData._accel;
-        _planeData._currForwardSpeed = FMath::Clamp(
-          newForwardSpeed, _planeData._minSpeed, _planeData._maxSpeed);
+    gameData.Input.Pitch = _planeData._currPitchValue;
+    gameData.Input.Yaw = _planeData._currYawValue;
+    gameData.Input.Roll = _planeData._currRollValue;
+  }
+  {
+    auto packet = PlayerInputPacket();
+    packet.Input = gameData.Input;
+    packet.Input.Index = gameData.InputIndex++;
+    enet_peer_send(
+      ServerPeer, 0, BuildPacket(packet, ENET_PACKET_FLAG_RELIABLE));
+
+    auto it = std::find_if(
+      gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
+        return p.Index == gameData.OwnPlayerIndex;
+      });
+    if (it != gameData.Players.end()) {
+      auto& player = *it;
+      ComputePhysics(player, packet.Input, DeltaTime);
+      auto position = player.Position;
+      _planePawn->SetActorLocation(FVector(position.x, position.y, position.z));
+    }
+
+    auto predictedInput = PredictedInput();
+    predictedInput.Input = packet.Input;
+    gameData.PredictedInputs.push_back(predictedInput);
+  }
+
+  {
+    if (gameData.InterpolationBuffer.size() >= 2) {
+      auto& from = gameData.InterpolationBuffer[0];
+      auto& to = gameData.InterpolationBuffer[1];
+
+      auto packetDiff = to.TickIndex - from.TickIndex;
+
+      auto interpolationIncr = DeltaTime / NET_TICK;
+      interpolationIncr /= packetDiff;
+
+      if (gameData.InterpolationBuffer.size() >= TargetInterpolationBufferSize)
+        interpolationIncr *= 1.f + 0.2f * (gameData.InterpolationBuffer.size() -
+                                           TargetInterpolationBufferSize);
+      else
+        interpolationIncr *=
+          std::fmaxf(1.f - 0.2f * (TargetInterpolationBufferSize -
+                                   gameData.InterpolationBuffer.size()),
+                     0.f);
+
+      for (const auto& fromPlayer : from.Players) {
+        auto playerIt = std::find_if(
+          gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
+            return p.Index == fromPlayer.PlayerIndex;
+          });
+        if (playerIt == gameData.Players.end())
+          continue;
+        auto& player = *playerIt;
+
+        if (fromPlayer.PlayerIndex == gameData.OwnPlayerIndex)
+          continue;
+
+        auto toIt = std::find_if(
+          to.Players.begin(), to.Players.end(), [&](const auto& p) {
+            return p.PlayerIndex == fromPlayer.PlayerIndex;
+          });
+        if (toIt == to.Players.end())
+          continue;
+        auto& toPlayer = *toIt;
+
+        player.Position = FMath::Lerp(
+          fromPlayer.Position, toPlayer.Position, gameData.InterpolationTime);
+        PlayerPositionReceived.Broadcast(
+          player.Index,
+          FVector(player.Position.x, player.Position.y, player.Position.z));
       }
-      const FVector localMove =
-        FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
-      _planePawn->AddActorLocalOffset(localMove, true);
-    }
 
-    if (Host == nullptr)
-      return;
-    auto Event = ENetEvent();
-    if (enet_host_service(Host, &Event, NET_TIMEOUT) > 0) {
-      do {
-        switch (Event.type) {
-          case ENetEventType::ENET_EVENT_TYPE_CONNECT: {
-            UE_LOG(ENet6,
-                   Log,
-                   TEXT("Peer %u connected!"),
-                   enet_peer_get_id(Event.peer));
-          } break;
-          case ENetEventType::ENET_EVENT_TYPE_DISCONNECT: {
-            UE_LOG(ENet6,
-                   Log,
-                   TEXT("Peer %u disconnected!"),
-                   enet_peer_get_id(Event.peer));
-          } break;
-          case ENetEventType::ENET_EVENT_TYPE_RECEIVE: {
-            UE_LOG(ENet6,
-                   Log,
-                   TEXT("Peer %u sent data (%u bytes)"),
-                   enet_peer_get_id(Event.peer),
-                   enet_packet_get_length(Event.packet));
-            auto len = Event.packet->dataLength;
-            auto bytes = std::vector<uint8_t>(len);
-            memcpy(bytes.data(), Event.packet->data, len);
-            HandleMessage(bytes);
-            enet_packet_dispose(Event.packet);
-          } break;
-        }
-      } while (enet_host_check_events(Host, &Event) > 0);
-    }
-
-    {
-      gameData.Input.Pitch = _planeData._currPitchValue;
-      gameData.Input.Yaw = _planeData._currYawValue;
-      gameData.Input.Roll = _planeData._currRollValue;
-    }
-    {
-      auto packet = PlayerInputPacket();
-      packet.Input = gameData.Input;
-      packet.Input.Index = gameData.InputIndex++;
-      enet_peer_send(
-        ServerPeer, 0, BuildPacket(packet, ENET_PACKET_FLAG_RELIABLE));
-
-      auto it = std::find_if(
-        gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
-          return p.Index == gameData.OwnPlayerIndex;
-        });
-      if (it != gameData.Players.end()) {
-        auto& player = *it;
-        ComputePhysics(player, packet.Input, DeltaTime);
-        auto position = player.Position;
-        _planePawn->SetActorLocation(
-          FVector(position.x, position.y, position.z));
-      }
-
-      auto predictedInput = PredictedInput();
-      predictedInput.Input = packet.Input;
-      gameData.PredictedInputs.push_back(predictedInput);
-    }
-
-    {
-      if (gameData.InterpolationBuffer.size() >= 2) {
-        auto& from = gameData.InterpolationBuffer[0];
-        auto& to = gameData.InterpolationBuffer[1];
-
-        auto packetDiff = to.TickIndex - from.TickIndex;
-
-        auto interpolationIncr = DeltaTime / NET_TICK;
-        interpolationIncr /= packetDiff;
-
-        if (gameData.InterpolationBuffer.size() >=
-            TargetInterpolationBufferSize)
-          interpolationIncr *=
-            1.f + 0.2f * (gameData.InterpolationBuffer.size() -
-                          TargetInterpolationBufferSize);
-        else
-          interpolationIncr *=
-            std::fmaxf(1.f - 0.2f * (TargetInterpolationBufferSize -
-                                     gameData.InterpolationBuffer.size()),
-                       0.f);
-
-        for (const auto& fromPlayer : from.Players) {
-          auto playerIt = std::find_if(
-            gameData.Players.begin(),
-            gameData.Players.end(),
-            [&](const auto& p) { return p.Index == fromPlayer.PlayerIndex; });
-          if (playerIt == gameData.Players.end())
-            continue;
-          auto& player = *playerIt;
-
-          if (fromPlayer.PlayerIndex == gameData.OwnPlayerIndex)
-            continue;
-
-          auto toIt = std::find_if(
-            to.Players.begin(), to.Players.end(), [&](const auto& p) {
-              return p.PlayerIndex == fromPlayer.PlayerIndex;
-            });
-          if (toIt == to.Players.end())
-            continue;
-          auto& toPlayer = *toIt;
-
-          player.Position = FMath::Lerp(
-            fromPlayer.Position, toPlayer.Position, gameData.InterpolationTime);
-          PlayerPositionReceived.Broadcast(
-            player.Index,
-            FVector(player.Position.x, player.Position.y, player.Position.z));
-        }
-
-        gameData.InterpolationTime += interpolationIncr;
-        if (gameData.InterpolationTime >= 1.f) {
-          gameData.InterpolationBuffer.erase(
-            gameData.InterpolationBuffer.begin());
-          gameData.InterpolationTime -= 1.f;
-        }
+      gameData.InterpolationTime += interpolationIncr;
+      if (gameData.InterpolationTime >= 1.f) {
+        gameData.InterpolationBuffer.erase(
+          gameData.InterpolationBuffer.begin());
+        gameData.InterpolationTime -= 1.f;
       }
     }
   }
