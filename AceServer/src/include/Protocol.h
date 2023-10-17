@@ -27,6 +27,8 @@ constexpr auto NET_TIMEOUT = 1;
 constexpr auto TargetInputBufferSize = 5;
 constexpr auto TargetInterpolationBufferSize = 5;
 
+const auto StartPos = Vector3(-15000, 0, 5000);
+
 enum class Opcode : uint8_t
 {
   C_PLAYERINPUT,
@@ -43,6 +45,21 @@ struct PlayerInput
   float Roll = 0;
   float Throttle = 0;
 };
+
+struct Player
+{
+  ENetPeer* Peer = nullptr;
+  size_t Index = 0;
+  std::string Name;
+  PlayerInput LastInput;
+  std::vector<PlayerInput> InputBuffer;
+  float InputBufferAdvancement = 0;
+
+  Vector3 Position;
+};
+
+void
+ComputePhysics(Player& player, const PlayerInput& input, float elapsedTime);
 
 void
 Serialize_f32(std::vector<uint8_t>& byteArray, float value);
@@ -194,7 +211,6 @@ struct PlayersPositionPacket
   struct CurrentPlayerData
   {
     Vector3 Position;
-    Vector3 Velocity;
   };
 
   std::optional<CurrentPlayerData> CurrentPlayerData;
@@ -226,9 +242,6 @@ PlayersPositionPacket::Serialize(std::vector<uint8_t>& byteArray) const
     Serialize_f32(byteArray, CurrentPlayerData->Position.x);
     Serialize_f32(byteArray, CurrentPlayerData->Position.y);
     Serialize_f32(byteArray, CurrentPlayerData->Position.z);
-    Serialize_f32(byteArray, CurrentPlayerData->Velocity.x);
-    Serialize_f32(byteArray, CurrentPlayerData->Velocity.y);
-    Serialize_f32(byteArray, CurrentPlayerData->Velocity.z);
   }
 }
 inline PlayersPositionPacket
@@ -250,12 +263,9 @@ PlayersPositionPacket::Unserialize(const std::vector<uint8_t>& byteArray,
   bool hasCurrentPlayerData = (bool)Unserialize_u8(byteArray, offset);
   if (hasCurrentPlayerData) {
     auto& currentPlayerData = packet.CurrentPlayerData.emplace();
-    currentPlayerData.Position.x = Unserialize_f32(byteArray, offset); // x
-    currentPlayerData.Position.y = Unserialize_f32(byteArray, offset); // y
-    currentPlayerData.Position.z = Unserialize_f32(byteArray, offset); // z
-    currentPlayerData.Velocity.x = Unserialize_f32(byteArray, offset); // x
-    currentPlayerData.Velocity.y = Unserialize_f32(byteArray, offset); // y
-    currentPlayerData.Velocity.z = Unserialize_f32(byteArray, offset); // z
+    currentPlayerData.Position.x = Unserialize_f32(byteArray, offset);
+    currentPlayerData.Position.y = Unserialize_f32(byteArray, offset);
+    currentPlayerData.Position.z = Unserialize_f32(byteArray, offset);
   }
 
   return packet;
@@ -271,7 +281,11 @@ Serialize_f32(std::vector<uint8_t>& byteArray, float value)
 inline void
 Serialize_f32(std::vector<uint8_t>& byteArray, size_t offset, float value)
 {
+#ifdef SRV
   uint32_t v = htonf(value);
+#else
+  float v = NETWORK_ORDERF(value);
+#endif
   assert(offset + sizeof(v) <= byteArray.size());
   memcpy(&byteArray[offset], &v, sizeof(v));
 }
@@ -367,9 +381,15 @@ Serialize_str(std::vector<uint8_t>& byteArray,
 inline float
 Unserialize_f32(const std::vector<uint8_t>& byteArray, size_t& offset)
 {
+#ifdef SRV
   uint32_t value;
   memcpy(&value, &byteArray[offset], sizeof(value));
   float v = ntohf(value);
+#else
+  float value;
+  memcpy(&value, &byteArray[offset], sizeof(value));
+  float v = NETWORK_ORDERF(value);
+#endif
   offset += sizeof(value);
   return v;
 }
@@ -427,8 +447,15 @@ template<typename T>
 ENetPacket*
 BuildPacket(const T& packet, enet_uint32 flags)
 {
-  std::vector<uint8_t> byteArray;
-  Serialize_u8(byteArray, static_cast<uint8_t>(T::Opcode));
-  packet.Serialize(byteArray);
-  return enet_packet_create(byteArray.data(), byteArray.size(), flags);
+  std::vector<uint8_t> bytes;
+  Serialize_u8(bytes, static_cast<uint8_t>(T::Opcode));
+  packet.Serialize(bytes);
+  return enet_packet_create(bytes.data(), bytes.size(), flags);
+}
+
+inline void
+ComputePhysics(Player& player, const PlayerInput& input, float elapsedTime)
+{
+  player.Position.x += 50 * input.Pitch;
+  player.Position.y += 50 * input.Roll;
 }

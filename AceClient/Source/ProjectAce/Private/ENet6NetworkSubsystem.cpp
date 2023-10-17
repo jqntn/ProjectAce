@@ -93,8 +93,7 @@ UENet6NetworkSubsystem::SetThrust(float thrustAdd)
 {
   const float newThrust =
     _planeData._accel + (thrustAdd * (GetWorld()->GetDeltaSeconds() * 5000.f));
-  _planeData._accel = newThrust; // FMath::Clamp(_planeData._accel,
-                                 // _planeData._minAccel, _planeData._maxAccel);
+  _planeData._accel = newThrust;
 }
 
 void
@@ -145,43 +144,43 @@ UENet6NetworkSubsystem::IsAllowedToTick() const
 void
 UENet6NetworkSubsystem::Tick(float DeltaTime)
 {
+  //// Plane physics
+  // if (_planePawn) {
+  //   // Compute Thrust
+  //   const float currAccel =
+  //     -_planePawn->GetActorRotation().Pitch *
+  //     DeltaTime /* * _planeData._accel*/; // Tilt up > slow down, Tilt down >
+  //                                         // accelerate
+  //   const float newForwardSpeed =
+  //     (_planeData._currForwardSpeed + currAccel) * _planeData._accel;
+  //   _planeData._currForwardSpeed =
+  //     FMath::Clamp(newForwardSpeed, _planeData._minSpeed,
+  //     _planeData._maxSpeed);
+
+  //  const FVector localMove =
+  //    FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
+  //  _planePawn->AddActorLocalOffset(localMove, true);
+
+  //  GEngine->AddOnScreenDebugMessage(
+  //    0,
+  //    0.f,
+  //    FColor::Green,
+  //    FString::Printf(TEXT("ForwardSpeed: %f"), localMove.X));
+
+  //  ProcessPitch();
+  //  ProcessRoll();
+  //  ProcessYaw();
+
+  //  FRotator deltaRotation(0, 0, 0);
+  //  deltaRotation.Pitch = _planeData._currPitchSpeed * DeltaTime;
+  //  deltaRotation.Yaw = _planeData._currYawSpeed * DeltaTime;
+  //  deltaRotation.Roll = _planeData._currRollSpeed * DeltaTime;
+
+  //  _planePawn->AddActorLocalRotation(deltaRotation);
+  //}
+
   if (Host == nullptr)
     return;
-
-  // Plane physics
-  if (_planePawn) {
-    // Compute Thrust
-    const float currAccel =
-      -_planePawn->GetActorRotation().Pitch *
-      DeltaTime /* * _planeData._accel*/; // Tilt up > slow down, Tilt down >
-                                          // accelerate
-    const float newForwardSpeed =
-      (_planeData._currForwardSpeed + currAccel) * _planeData._accel;
-    _planeData._currForwardSpeed =
-      FMath::Clamp(newForwardSpeed, _planeData._minSpeed, _planeData._maxSpeed);
-
-    const FVector localMove =
-      FVector(_planeData._currForwardSpeed * DeltaTime, 0.f, 0.f);
-    _planePawn->AddActorLocalOffset(localMove, true);
-
-    GEngine->AddOnScreenDebugMessage(
-      0,
-      0.f,
-      FColor::Green,
-      FString::Printf(TEXT("ForwardSpeed: %f"), localMove.X));
-
-    ProcessPitch();
-    ProcessRoll();
-    ProcessYaw();
-
-    FRotator deltaRotation(0, 0, 0);
-    deltaRotation.Pitch = _planeData._currPitchSpeed * DeltaTime;
-    deltaRotation.Yaw = _planeData._currYawSpeed * DeltaTime;
-    deltaRotation.Roll = _planeData._currRollSpeed * DeltaTime;
-
-    _planePawn->AddActorLocalRotation(deltaRotation);
-  }
-
   auto Event = ENetEvent();
   if (enet_host_service(Host, &Event, NET_TIMEOUT) > 0) {
     do {
@@ -214,71 +213,86 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
     } while (enet_host_check_events(Host, &Event) > 0);
   }
 
-  auto it = std::find_if(
-    gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
-      return p.Index == gameData.OwnPlayerIndex;
-    });
-  assert(it != gameData.players.end());
-  auto& player = *it;
+  {
+    gameData.Input.Pitch = _planeData._currPitchValue;
+    gameData.Input.Yaw = _planeData._currYawValue;
+    gameData.Input.Roll = _planeData._currRollValue;
+  }
+  {
+    auto packet = PlayerInputPacket();
+    packet.Input = gameData.Input;
+    packet.Input.Index = gameData.InputIndex++;
+    enet_peer_send(
+      ServerPeer, 0, BuildPacket(packet, ENET_PACKET_FLAG_RELIABLE));
 
-  auto packet = PlayerInputPacket();
-  packet.Input = gameData.Input;
-  packet.Input.Index = gameData.InputIndex++;
-
-  ComputePhysics(player, packet.Input, NET_TICK);
-
-  enet_peer_send(ServerPeer, 0, BuildPacket(packet, ENET_PACKET_FLAG_RELIABLE));
-
-  auto predictedInput = PredictedInput();
-  predictedInput.Input = packet.Input;
-  gameData.PredictedInputs.push_back(predictedInput);
-
-  if (gameData.InterpolationBuffer.size() >= 2) {
-    auto& from = gameData.InterpolationBuffer[0];
-    auto& to = gameData.InterpolationBuffer[1];
-
-    auto packetDiff = to.TickIndex - from.TickIndex;
-
-    auto interpolationIncr = DeltaTime / NET_TICK;
-    interpolationIncr /= packetDiff;
-
-    if (gameData.InterpolationBuffer.size() >= TargetInterpolationBufferSize)
-      interpolationIncr *= 1.f + 0.2f * (gameData.InterpolationBuffer.size() -
-                                         TargetInterpolationBufferSize);
-    else
-      interpolationIncr *=
-        std::fmaxf(1.f - 0.2f * (TargetInterpolationBufferSize -
-                                 gameData.InterpolationBuffer.size()),
-                   0.f);
-
-    for (const auto& fromPlayer : from.Players) {
-      auto playerIt = std::find_if(
-        gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
-          return p.Index == fromPlayer.PlayerIndex;
-        });
-      if (playerIt == gameData.Players.end())
-        continue;
-
-      auto& pplayer = *playerIt;
-      if (fromPlayer.PlayerIndex == gameData.OwnPlayerIndex)
-        continue;
-
-      auto toIt = std::find_if(
-        to.Players.begin(), to.Players.end(), [&](const auto& toPlayer) {
-          return toPlayer.PlayerIndex == fromPlayer.PlayerIndex;
-        });
-      if (toIt == to.Players.end())
-        continue;
-
-      auto& toPlayer = *toIt;
-
-      pplayer.Position = toPlayer.Position;
+    auto it = std::find_if(
+      gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
+        return p.Index == gameData.OwnPlayerIndex;
+      });
+    if (it != gameData.Players.end()) {
+      auto& player = *it;
+      ComputePhysics(player, packet.Input, DeltaTime);
+      auto position = player.Position;
+      _planePawn->SetActorLocation(FVector(position.x, position.y, position.z));
     }
 
-    gameData.InterpolationTime += interpolationIncr;
-    if (gameData.InterpolationTime >= 1.f) {
-      gameData.InterpolationBuffer.erase(gameData.InterpolationBuffer.begin());
-      gameData.InterpolationTime -= 1.f;
+    auto predictedInput = PredictedInput();
+    predictedInput.Input = packet.Input;
+    gameData.PredictedInputs.push_back(predictedInput);
+  }
+
+  {
+    if (gameData.InterpolationBuffer.size() >= 2) {
+      auto& from = gameData.InterpolationBuffer[0];
+      auto& to = gameData.InterpolationBuffer[1];
+
+      auto packetDiff = to.TickIndex - from.TickIndex;
+
+      auto interpolationIncr = DeltaTime / NET_TICK;
+      interpolationIncr /= packetDiff;
+
+      if (gameData.InterpolationBuffer.size() >= TargetInterpolationBufferSize)
+        interpolationIncr *= 1.f + 0.2f * (gameData.InterpolationBuffer.size() -
+                                           TargetInterpolationBufferSize);
+      else
+        interpolationIncr *=
+          std::fmaxf(1.f - 0.2f * (TargetInterpolationBufferSize -
+                                   gameData.InterpolationBuffer.size()),
+                     0.f);
+
+      for (const auto& fromPlayer : from.Players) {
+        auto playerIt = std::find_if(
+          gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
+            return p.Index == fromPlayer.PlayerIndex;
+          });
+        if (playerIt == gameData.Players.end())
+          continue;
+        auto& player = *playerIt;
+
+        if (fromPlayer.PlayerIndex == gameData.OwnPlayerIndex)
+          continue;
+
+        auto toIt = std::find_if(
+          to.Players.begin(), to.Players.end(), [&](const auto& p) {
+            return p.PlayerIndex == fromPlayer.PlayerIndex;
+          });
+        if (toIt == to.Players.end())
+          continue;
+        auto& toPlayer = *toIt;
+
+        player.Position = FMath::Lerp(
+          fromPlayer.Position, toPlayer.Position, gameData.InterpolationTime);
+        PlayerPositionReceived.Broadcast(
+          player.Index,
+          FVector(player.Position.x, player.Position.y, player.Position.z));
+      }
+
+      gameData.InterpolationTime += interpolationIncr;
+      if (gameData.InterpolationTime >= 1.f) {
+        gameData.InterpolationBuffer.erase(
+          gameData.InterpolationBuffer.begin());
+        gameData.InterpolationTime -= 1.f;
+      }
     }
   }
 }
@@ -353,13 +367,6 @@ UENet6NetworkSubsystem::Deinitialize()
 }
 
 void
-UENet6NetworkSubsystem::ComputePhysics(Player& player,
-                                       const PlayerInput& input,
-                                       float elapsedTime)
-{
-}
-
-void
 UENet6NetworkSubsystem::HandleMessage(const std::vector<uint8_t>& message)
 {
   auto offset = size_t();
@@ -369,9 +376,8 @@ UENet6NetworkSubsystem::HandleMessage(const std::vector<uint8_t>& message)
     case Opcode::S_GAMEDATA: {
       auto packet = GameDataPacket::Unserialize(message, offset);
       gameData.OwnPlayerIndex = packet.PlayerIndex;
-      gameData.OwnPlayerIndex = packet.PlayerIndex;
-      gameData.OwnPlayerIndex = packet.PlayerIndex;
     } break;
+
     case Opcode::S_PLAYERLIST: {
       auto packet = PlayerListPacket::Unserialize(message, offset);
       for (auto it = gameData.Players.begin(); it != gameData.Players.end();) {
@@ -379,9 +385,11 @@ UENet6NetworkSubsystem::HandleMessage(const std::vector<uint8_t>& message)
           std::find_if(packet.Players.begin(),
                        packet.Players.end(),
                        [&](const auto& p) { return p.Index == it->Index; });
-        if (playerIt == packet.Players.end())
+        if (playerIt == packet.Players.end()) {
           it = gameData.Players.erase(it);
-        else
+          if (it->Index != gameData.OwnPlayerIndex)
+            PlayerLeft.Broadcast(it->Index);
+        } else
           ++it;
       }
       for (const auto& packetPlayer : packet.Players) {
@@ -393,67 +401,50 @@ UENet6NetworkSubsystem::HandleMessage(const std::vector<uint8_t>& message)
           auto& player = gameData.Players.emplace_back();
           player.Index = packetPlayer.Index;
           player.Name = packetPlayer.Name;
+          if (player.Index != gameData.OwnPlayerIndex)
+            PlayerJoined.Broadcast(player.Index);
         }
       }
     } break;
+
     case Opcode::S_PLAYERPOSITION: {
       auto packet = PlayersPositionPacket::Unserialize(message, offset);
-
-      auto ownPlayerItGameData = std::find_if(
-        gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
-          return p.Index == gameData.OwnPlayerIndex;
-        });
-      assert(ownPlayerItGameData != gameData.players.end());
-      auto& ownPlayerGameData = *ownPlayerItGameData;
-
-      auto ownPlayerItPacket = std::find_if(
-        packet.Players.begin(), packet.Players.end(), [&](const auto& p) {
-          return p.PlayerIndex == gameData.OwnPlayerIndex;
-        });
-      if (ownPlayerItPacket != packet.Players.end()) {
-        auto& ownPlayerPacket = *ownPlayerItPacket;
-
-        const FVector localMove = FVector(ownPlayerPacket.Position.x,
-                                          ownPlayerPacket.Position.y,
-                                          ownPlayerPacket.Position.z);
-        _planePawn->AddActorLocalOffset(localMove, true);
+      {
+        if (gameData.InterpolationBuffer.empty()) {
+          auto tickIndex = packet.TickIndex;
+          for (auto i = 0; i < TargetInterpolationBufferSize; i++) {
+            packet.TickIndex =
+              tickIndex - (TargetInterpolationBufferSize - i - 1);
+            gameData.InterpolationBuffer.push_back(packet);
+          }
+        } else
+          gameData.InterpolationBuffer.push_back(packet);
       }
+      {
+        while (!gameData.PredictedInputs.empty() &&
+               gameData.PredictedInputs.front().Input.Index <=
+                 packet.LastInputIndex)
+          gameData.PredictedInputs.erase(gameData.PredictedInputs.begin());
+      }
+      {
+        auto ownPlayerIt = std::find_if(
+          gameData.Players.begin(), gameData.Players.end(), [&](const auto& p) {
+            return p.Index == gameData.OwnPlayerIndex;
+          });
+        assert(ownPlayerIt != gameData.Players.end());
+        auto& ownPlayer = *ownPlayerIt;
 
-      // if (gameData.InterpolationBuffer.empty()) {
-      //   auto tickIndex = packet.TickIndex;
-      //   for (auto i = 0; i < TargetInterpolationBufferSize; ++i) {
-      //     packet.TickIndex =
-      //       tickIndex - (TargetInterpolationBufferSize - i - 1);
-      //     gameData.InterpolationBuffer.push_back(packet);
-      //   }
-      // } else
-      //   gameData.InterpolationBuffer.push_back(packet);
-
-      // while (!gameData.PredictedInputs.empty() &&
-      //        gameData.PredictedInputs.front().Input.Index <=
-      //          packet.LastInputIndex)
-      //   gameData.PredictedInputs.erase(gameData.PredictedInputs.begin());
-
-      // auto ownPlayerIt = std::find_if(
-      //   gameData.Players.begin(), gameData.Players.end(), [&](const auto& p)
-      //   {
-      //     return p.Index == gameData.OwnPlayerIndex;
-      //   });
-      // assert(ownPlayerIt != gameData.players.end());
-
-      // auto& ownPlayer = *ownPlayerIt;
-      // if (packet.CurrentPlayerData) {
-      //   auto predictedPosition = ownPlayer.Position;
-
-      //  ownPlayer.Position = packet.CurrentPlayerData->Position;
-      //  ownPlayer.Velocity = packet.CurrentPlayerData->Velocity;
-
-      //  for (auto& predictedInput : gameData.PredictedInputs)
-      //    ComputePhysics(ownPlayer, predictedInput.Input, NET_TICK);
-
-      //  auto reconciliatedPosition = ownPlayer.Position;
-      //  auto diff = reconciliatedPosition - predictedPosition;
-      //}
+        if (packet.CurrentPlayerData.has_value()) {
+          auto predictedPosition = ownPlayer.Position;
+          ownPlayer.Position = packet.CurrentPlayerData->Position;
+          for (auto& predictedInput : gameData.PredictedInputs)
+            ComputePhysics(ownPlayer, predictedInput.Input, NET_TICK);
+          auto reconciliatedPosition = ownPlayer.Position;
+          _planePawn->SetActorLocation(FVector(reconciliatedPosition.x,
+                                               reconciliatedPosition.y,
+                                               reconciliatedPosition.z));
+        }
+      }
     } break;
   }
 }

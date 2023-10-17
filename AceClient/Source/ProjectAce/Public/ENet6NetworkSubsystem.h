@@ -12,15 +12,6 @@ struct PredictedInput
   PlayerInput Input;
 };
 
-struct Player
-{
-  size_t Index = 0;
-  std::string Name;
-
-  Vector3 Position;
-  Vector3 Velocity;
-};
-
 struct GameData
 {
   ENetPeer* ServerPeer = nullptr;
@@ -35,6 +26,15 @@ struct GameData
   std::vector<PlayersPositionPacket> InterpolationBuffer;
   float InterpolationTime = 0.f;
 };
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerJoined, int, PlayerIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPlayerLeft, int, PlayerIndex);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPlayerPositionReceived,
+                                             int,
+                                             PlayerIndex,
+                                             FVector,
+                                             PlayerPosition);
 
 UCLASS()
 class PROJECTACE_API UENet6NetworkSubsystem
@@ -131,11 +131,16 @@ public:
   void Initialize(FSubsystemCollectionBase& Collection) override;
   void Deinitialize() override;
 
-  void ComputePhysics(Player& player,
-                      const PlayerInput& input,
-                      float elapsedTime);
-
   void HandleMessage(const std::vector<uint8_t>& message);
+
+  UPROPERTY(BlueprintAssignable)
+  FPlayerJoined PlayerJoined;
+
+  UPROPERTY(BlueprintAssignable)
+  FPlayerLeft PlayerLeft;
+
+  UPROPERTY(BlueprintAssignable)
+  FPlayerPositionReceived PlayerPositionReceived;
 
 private:
   ENetHost* Host = nullptr;

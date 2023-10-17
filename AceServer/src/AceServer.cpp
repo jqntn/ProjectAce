@@ -5,19 +5,6 @@
 
 #include <iostream>
 
-struct Player
-{
-  ENetPeer* Peer = nullptr;
-  size_t Index = 0;
-  std::string Name;
-  PlayerInput LastInput;
-  std::vector<PlayerInput> InputBuffer;
-  float InputBufferAdvancement = 0;
-
-  Vector3 Position;
-  Vector3 Velocity;
-};
-
 struct GameData
 {
   uint32_t TickIndex = 0;
@@ -31,9 +18,6 @@ struct ServerData
 
 void
 ServerTick(ServerData& serverData, GameData& gameData);
-
-void
-ComputePhysics(Player& player, const PlayerInput& input, float elapsedTime);
 
 void
 HandleMessage(Player& player,
@@ -75,32 +59,35 @@ main()
         switch (event.type) {
           case ENetEventType::ENET_EVENT_TYPE_CONNECT: {
             std::cout << enet_peer_get_id(event.peer) << " - Peer Connected\n";
-
-            auto it = find_if(gameData.Players.begin(),
-                              gameData.Players.end(),
-                              [&](const auto& p) { return p.Peer == nullptr; });
-
-            if (it == gameData.Players.end()) {
-              auto& player = gameData.Players.emplace_back();
-              player.Index = gameData.Players.size() - 1;
-              it = gameData.Players.end() - 1;
+            {
+              auto it =
+                find_if(gameData.Players.begin(),
+                        gameData.Players.end(),
+                        [&](const auto& p) { return p.Peer == nullptr; });
+              if (it == gameData.Players.end()) {
+                auto& player = gameData.Players.emplace_back();
+                player.Index = gameData.Players.size() - 1;
+                it = gameData.Players.end() - 1;
+              }
+              auto& player = *it;
+              player.Peer = event.peer;
+              player.Name.clear();
+              player.Position = StartPos;
+              {
+                auto gameDataPacket = GameDataPacket();
+                gameDataPacket.PlayerIndex = player.Index;
+                enet_peer_send(
+                  player.Peer,
+                  0,
+                  BuildPacket(gameDataPacket, ENET_PACKET_FLAG_RELIABLE));
+              }
             }
-
-            auto& player = *it;
-            player.Peer = event.peer;
-            player.Name.clear();
-
-            auto gameDataPacket = GameDataPacket();
-            gameDataPacket.PlayerIndex = player.Index;
-
-            enet_peer_send(
-              player.Peer,
-              0,
-              BuildPacket(gameDataPacket, ENET_PACKET_FLAG_RELIABLE));
-            auto playerListPacket = BuidPlayerListPacket(gameData);
-            for (const auto& player : gameData.Players)
-              if (player.Peer != nullptr)
-                enet_peer_send(player.Peer, 0, playerListPacket);
+            {
+              auto playerListPacket = BuidPlayerListPacket(gameData);
+              for (const auto& player : gameData.Players)
+                if (player.Peer != nullptr)
+                  enet_peer_send(player.Peer, 0, playerListPacket);
+            }
           } break;
 
           case ENetEventType::ENET_EVENT_TYPE_DISCONNECT_TIMEOUT: {
@@ -165,14 +152,11 @@ ServerTick(ServerData& serverData, GameData& gameData)
   for (auto& player : gameData.Players) {
     if (!player.InputBuffer.empty()) {
       auto inc = 1.f;
-
       if (player.InputBuffer.size() < TargetInputBufferSize)
         inc *= 1.f - (TargetInputBufferSize - player.InputBuffer.size()) * .05f;
       else if (player.InputBuffer.size() > TargetInputBufferSize)
         inc *= 1.f + (player.InputBuffer.size() - TargetInputBufferSize) * .05f;
-
       player.InputBufferAdvancement += inc;
-
       if (player.InputBufferAdvancement >= 1.f)
         while (player.InputBufferAdvancement >= 1.f) {
           auto& currentInput = player.InputBuffer.front();
@@ -185,9 +169,7 @@ ServerTick(ServerData& serverData, GameData& gameData)
           player.InputBufferAdvancement -= 1.f;
         }
     }
-
-    auto input = player.LastInput;
-    ComputePhysics(player, input, NET_TICK);
+    ComputePhysics(player, player.LastInput, NET_TICK);
   }
 
   for (const auto& player : gameData.Players)
@@ -195,11 +177,6 @@ ServerTick(ServerData& serverData, GameData& gameData)
       auto packet = BuildPlayerPositionPacket(gameData, player);
       enet_peer_send(player.Peer, 0, packet);
     }
-}
-
-void
-ComputePhysics(Player& player, const PlayerInput& input, float elapsedTime)
-{
 }
 
 void
@@ -239,8 +216,7 @@ BuildPlayerPositionPacket(GameData& gameData, const Player& player)
   packet.TickIndex = gameData.TickIndex;
 
   auto& currentPlayerData = packet.CurrentPlayerData.emplace();
-  currentPlayerData.Position = /*player.Position*/ Vector3(10,10,10);
-  currentPlayerData.Velocity = player.Velocity;
+  currentPlayerData.Position = player.Position;
 
   for (const auto& other : gameData.Players) {
     if (player.Index == other.Index)
@@ -248,7 +224,7 @@ BuildPlayerPositionPacket(GameData& gameData, const Player& player)
     if (other.Peer != nullptr) {
       auto& packetPlayer = packet.Players.emplace_back();
       packetPlayer.PlayerIndex = other.Index;
-      packetPlayer.Position = /*other.Position*/ Vector3(10, 10, 10);
+      packetPlayer.Position = other.Position;
     }
   }
 
