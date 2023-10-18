@@ -88,8 +88,7 @@ public:
     bool _bIntentionalRoll{ false };
 
     UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
-    bool _bResolveRoll{ false }; // If true, plane will automatically roll to
-                                 // flat if no input pressed after second
+    bool _bResolveRoll{ false }; 
 
     float _currResolveRollTimer{ 0.0f };
     UPROPERTY(VisibleAnywhere, Category = "FlightPhysics")
