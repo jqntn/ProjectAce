@@ -224,8 +224,8 @@ UENet6NetworkSubsystem::Tick(float DeltaTime)
       auto position = player.Position;
       auto rotation = player.Rotation;
       _planePawn->SetActorLocation(FVector(position.x, position.y, position.z));
-      _planePawn->SetActorRotation(
-        FVector(rotation.x, rotation.y, rotation.z).ToOrientationQuat());
+      _planePawn->AddActorLocalRotation(
+        FVector(rotation.x, rotation.y, rotation.z).ToOrientationRotator());
     }
 
     auto predictedInput = PredictedInput();
@@ -426,22 +426,22 @@ UENet6NetworkSubsystem::HandleMessage(const std::vector<uint8_t>& message)
         assert(ownPlayerIt != gameData.Players.end());
         auto& ownPlayer = *ownPlayerIt;
 
-        if (packet.CurrentPlayerData.has_value()) {
-          auto predictedPosition = ownPlayer.Position;
-          ownPlayer.Position = packet.CurrentPlayerData->Position;
-          ownPlayer.Rotation = packet.CurrentPlayerData->Rotation;
-          for (auto& predictedInput : gameData.PredictedInputs)
-            ComputePhysics(ownPlayer, predictedInput.Input, NET_TICK);
-          auto reconciliatedPosition = ownPlayer.Position;
-          auto reconciliatedRotation = ownPlayer.Rotation;
-          _planePawn->SetActorLocation(FVector(reconciliatedPosition.x,
-                                               reconciliatedPosition.y,
-                                               reconciliatedPosition.z));
-          _planePawn->SetActorRotation(FVector(reconciliatedRotation.x,
-                                               reconciliatedRotation.y,
-                                               reconciliatedRotation.z)
-                                         .ToOrientationQuat());
-        }
+        // if (packet.CurrentPlayerData.has_value()) {
+        //   auto predictedPosition = ownPlayer.Position;
+        //   ownPlayer.Position = packet.CurrentPlayerData->Position;
+        //   ownPlayer.Rotation = packet.CurrentPlayerData->Rotation;
+        //   for (auto& predictedInput : gameData.PredictedInputs)
+        //     ComputePhysics(ownPlayer, predictedInput.Input, NET_TICK);
+        //   auto reconciliatedPosition = ownPlayer.Position;
+        //   auto reconciliatedRotation = ownPlayer.Rotation;
+        //   _planePawn->SetActorLocation(FVector(reconciliatedPosition.x,
+        //                                        reconciliatedPosition.y,
+        //                                        reconciliatedPosition.z));
+        //   _planePawn->SetActorRotation(FVector(reconciliatedRotation.x,
+        //                                        reconciliatedRotation.y,
+        //                                        reconciliatedRotation.z)
+        //                                  .ToOrientationQuat());
+        // }
       }
     } break;
   }

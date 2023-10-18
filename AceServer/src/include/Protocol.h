@@ -497,18 +497,18 @@ ComputePhysics(Player& player, const PlayerInput& input, float elapsedTime)
 
   if (_bResolveRoll)
     player._currResolveRollTimer += elapsedTime;
-  float currAccel = -player.Rotation.x * elapsedTime;
+  float currAccel = player.Rotation.y * elapsedTime;
   float newForwardSpeed =
     (player._currForwardSpeed + currAccel) * input.Throttle;
   player._currForwardSpeed = std::clamp(newForwardSpeed, _minSpeed, _maxSpeed);
   {
     float targetPitchSpeed = input.Pitch * _pitchRateMult;
-    // player._currPitchSpeed =
-    //   SmoothLerp(player._currPitchSpeed, targetPitchSpeed, elapsedTime, 2.f);
+    player._currPitchSpeed =
+      SmoothLerp(player._currPitchSpeed, targetPitchSpeed, elapsedTime, 2.f);
     player._currPitchSpeed = targetPitchSpeed;
   }
   {
-    if ((player.Rotation.z <= 0.1f && player.Rotation.z >= -0.1f) &&
+    if ((player.Rotation.x <= 0.1f && player.Rotation.x >= -0.1f) &&
         input.Roll == 0.f)
       return;
     player._bIntentionalRoll = std::abs(input.Roll) > 0.f;
@@ -520,10 +520,10 @@ ComputePhysics(Player& player, const PlayerInput& input, float elapsedTime)
     } else if (_bResolveRoll &&
                player._currResolveRollTimer >= player._maxResolveRollTimer &&
                input.Roll == 0.0f && input.Pitch == 0.0f) {
-      targetRollSpeed = (player.Rotation.z * -2.f);
+      targetRollSpeed = (player.Rotation.x * -2.f);
     }
-    // player._currRollSpeed =
-    //   SmoothLerp(player._currRollSpeed, targetRollSpeed, elapsedTime, 2.f);
+    player._currRollSpeed =
+      SmoothLerp(player._currRollSpeed, targetRollSpeed, elapsedTime, 2.f);
     player._currRollSpeed = targetRollSpeed;
   }
   {
@@ -536,9 +536,9 @@ ComputePhysics(Player& player, const PlayerInput& input, float elapsedTime)
   }
   Vector3 localMove = Vector3(player._currForwardSpeed * elapsedTime, 0.f, 0.f);
   Vector3 deltaRotation(0, 0, 0);
-  deltaRotation.x = player._currPitchSpeed * elapsedTime;
-  deltaRotation.y = player._currYawSpeed * elapsedTime;
-  deltaRotation.z = player._currRollSpeed * elapsedTime;
+  deltaRotation.y = player._currPitchSpeed * elapsedTime;
+  deltaRotation.z = player._currYawSpeed * elapsedTime;
+  deltaRotation.x = player._currRollSpeed * elapsedTime;
 
   player.Position += localMove;
   player.Rotation += deltaRotation;
